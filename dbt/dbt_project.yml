@@ -1,8 +1,9 @@
 name: doorsignal
-version: "0.1.0"
+version: "0.2.0"
 config-version: 2
 profile: doorsignal
 model-paths: ["models"]
+macro-paths: ["macros"]
 test-paths: ["tests"]
 target-path: "target"
 clean-targets: ["target", "dbt_packages"]
@@ -10,3 +11,10 @@ clean-targets: ["target", "dbt_packages"]
 models:
   doorsignal:
     +materialized: view
+    staging:
+      +schema: staging
+    intermediate:
+      +schema: intermediate
+    marts:
+      +schema: marts
+      +materialized: table

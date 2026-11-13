@@ -474,7 +474,7 @@ def generate(cfg: dict | None = None, seed: int | None = None, hud_path: Path | 
         "sim_tenants": pd.DataFrame(tenants),
         "sim_leases": pd.DataFrame(leases),
         "sim_lease_events": pd.DataFrame(events),
-        "sim_work_orders": pd.DataFrame(work_orders),
+        "sim_work_orders": pd.DataFrame(work_orders).astype({"satisfaction": "Int64"}),
         "sim_ledger_entries": pd.DataFrame(ledger),
     }
     truth = {

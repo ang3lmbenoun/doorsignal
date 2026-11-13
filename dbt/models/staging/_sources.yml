@@ -1,0 +1,16 @@
+version: 2
+sources:
+  - name: raw
+    schema: raw
+    description: "Landing tables. sim_* are SYNTHETIC_CALIBRATED; ref_* are REAL_PUBLIC."
+    tables:
+      - name: sim_owners
+      - name: sim_properties
+      - name: sim_units
+      - name: sim_vendors
+      - name: sim_tenants
+      - name: sim_leases
+      - name: sim_lease_events
+      - name: sim_work_orders
+      - name: sim_ledger_entries
+      - name: ref_hud_safmr

@@ -11,4 +11,5 @@
 | M6 | Tableau dashboards, README, demo | Another person runs it from README |
 | M7 | Fair-housing audit harness, renewal ranker, narrators | Planted disparity detected; null scenario not flagged |
 
-Current: M1 (simulator + raw load built; waiting on Neon load run by Angel)
+Current: M2 built and passing locally (dbt build PASS=91 on Postgres 16). Waiting on Angel to run it against Neon.
+Done: M0 (CI green), M1 (load clean in Neon, 13 tables).

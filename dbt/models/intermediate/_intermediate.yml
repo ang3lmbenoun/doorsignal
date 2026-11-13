@@ -1,0 +1,14 @@
+version: 2
+models:
+  - name: int_work_order_timing
+    columns:
+      - {name: work_order_id, tests: [unique, not_null]}
+  - name: int_lease_early_90
+    columns:
+      - {name: lease_id, tests: [unique, not_null]}
+  - name: int_lease_balance
+    columns:
+      - {name: lease_id, tests: [unique, not_null]}
+  - name: int_lease_outcomes
+    columns:
+      - {name: lease_id, tests: [unique, not_null]}

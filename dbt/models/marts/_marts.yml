@@ -1,0 +1,32 @@
+version: 2
+models:
+  - name: dim_property
+    columns:
+      - {name: property_id, tests: [unique, not_null]}
+  - name: dim_unit
+    columns:
+      - {name: unit_id, tests: [unique, not_null]}
+  - name: dim_vendor
+    columns:
+      - {name: vendor_id, tests: [unique, not_null]}
+  - name: fct_work_orders
+    columns:
+      - {name: work_order_id, tests: [unique, not_null]}
+      - name: severity
+        tests:
+          - accepted_values: {values: ['routine', 'urgent', 'emergency']}
+  - name: fct_ledger_entries
+    columns:
+      - {name: entry_id, tests: [unique, not_null]}
+      - name: entry_type
+        tests:
+          - accepted_values: {values: ['charge_rent', 'late_fee', 'payment']}
+  - name: fct_leases
+    description: "One row per lease with outcome, first-90-day work-order features, ledger totals and HUD SAFMR comparison."
+    columns:
+      - {name: lease_id, tests: [unique, not_null]}
+      - name: outcome
+        tests:
+          - accepted_values: {values: ['renewed', 'moved_out', 'open']}
+      - name: safmr_rent
+        tests: [not_null]

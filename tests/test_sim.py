@@ -107,3 +107,14 @@ def test_leases_do_not_overlap_per_unit(run):
     nxt = lease.groupby("unit_id")["start_date"].shift(-1)
     gap = (nxt - lease["end_date"]).dropna()
     assert (gap >= timedelta(days=0)).all()
+
+
+def test_configured_zips_exist_in_hud_file(cfg):
+    from sim.generate import HUD_PATH
+    from sim.hud import load_safmr
+
+    if not HUD_PATH.exists():
+        pytest.skip("HUD SAFMR file not downloaded")
+    hud = load_safmr(HUD_PATH)
+    missing = [z["zip"] for z in cfg["zips"]["items"] if z["zip"] not in hud]
+    assert missing == []

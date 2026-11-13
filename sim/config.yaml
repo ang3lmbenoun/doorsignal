@@ -25,11 +25,17 @@ portfolio:
 zips:
   basis: "assumption: ZIP choice and area labels are approximate, verify against the HUD file. rent_multiplier is used only when no HUD file is loaded."
   items:
-    - {zip: "76117", area_label: "Haltom City / NE Fort Worth", rent_multiplier: 0.95, weight: 0.25}
-    - {zip: "76010", area_label: "Arlington", rent_multiplier: 1.00, weight: 0.20}
-    - {zip: "75061", area_label: "Irving", rent_multiplier: 1.05, weight: 0.20}
-    - {zip: "76116", area_label: "Fort Worth west", rent_multiplier: 1.02, weight: 0.20}
-    - {zip: "75216", area_label: "Dallas Oak Cliff", rent_multiplier: 0.90, weight: 0.15}
+    - {zip: "76117", area_label: "Haltom City / NE Fort Worth", rent_multiplier: 0.95, weight: 0.14}
+    - {zip: "76010", area_label: "Arlington", rent_multiplier: 1.00, weight: 0.10}
+    - {zip: "76018", area_label: "Arlington southeast", rent_multiplier: 1.05, weight: 0.07}
+    - {zip: "75061", area_label: "Irving", rent_multiplier: 1.05, weight: 0.10}
+    - {zip: "76116", area_label: "Fort Worth west", rent_multiplier: 1.02, weight: 0.10}
+    - {zip: "76133", area_label: "Fort Worth southwest", rent_multiplier: 0.95, weight: 0.08}
+    - {zip: "75216", area_label: "Dallas Oak Cliff", rent_multiplier: 0.90, weight: 0.08}
+    - {zip: "75231", area_label: "Dallas northeast", rent_multiplier: 0.95, weight: 0.09}
+    - {zip: "75040", area_label: "Garland", rent_multiplier: 1.00, weight: 0.09}
+    - {zip: "75150", area_label: "Mesquite", rent_multiplier: 0.98, weight: 0.08}
+    - {zip: "76205", area_label: "Denton", rent_multiplier: 1.00, weight: 0.09}
 
 market:
   placeholder_base_rent_by_beds: {value: {0: 1000, 1: 1200, 2: 1500, 3: 1850, 4: 2200}, basis: "assumption PLACEHOLDER, replaced by HUD SAFMR by ZIP and bedroom when data/reference/fy2026_safmrs_revised.xlsx is present"}

@@ -10,3 +10,11 @@
 8. `pytest -q` and `ruff check .`
 
 GitHub: add repository secret DATABASE_URL (Settings > Secrets and variables > Actions) so CI can reach Neon.
+
+## M2: load HUD data and build the warehouse
+
+```
+python -m ingest.load_hud          # real HUD SAFMR rents for Texas ZIPs -> raw.ref_hud_safmr
+python -m ingest.run_dbt build     # staging -> intermediate -> marts, plus all tests
+```
+Expect `Done. PASS=91 WARN=0 ERROR=0`. Needs `data/reference/fy2026_safmrs_revised.xlsx`.

@@ -1,0 +1,67 @@
+version: 2
+models:
+  - name: stg_owners
+    columns:
+      - {name: owner_id, tests: [unique, not_null]}
+  - name: stg_properties
+    columns:
+      - {name: property_id, tests: [unique, not_null]}
+      - name: owner_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_owners'), field: owner_id}
+  - name: stg_units
+    columns:
+      - {name: unit_id, tests: [unique, not_null]}
+      - name: property_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_properties'), field: property_id}
+  - name: stg_vendors
+    columns:
+      - {name: vendor_id, tests: [unique, not_null]}
+  - name: stg_tenants
+    columns:
+      - {name: tenant_id, tests: [unique, not_null]}
+  - name: stg_leases
+    columns:
+      - {name: lease_id, tests: [unique, not_null]}
+      - name: unit_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_units'), field: unit_id}
+      - name: tenant_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_tenants'), field: tenant_id}
+      - name: monthly_rent
+        tests: [not_null]
+  - name: stg_lease_events
+    columns:
+      - {name: event_id, tests: [unique, not_null]}
+      - name: lease_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_leases'), field: lease_id}
+  - name: stg_work_orders
+    columns:
+      - {name: work_order_id, tests: [unique, not_null]}
+      - name: lease_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_leases'), field: lease_id}
+      - name: vendor_id
+        tests:
+          - relationships: {to: ref('stg_vendors'), field: vendor_id}
+  - name: stg_ledger_entries
+    columns:
+      - {name: entry_id, tests: [unique, not_null]}
+      - name: lease_id
+        tests:
+          - not_null
+          - relationships: {to: ref('stg_leases'), field: lease_id}
+  - name: stg_hud_safmr
+    description: "REAL_PUBLIC (evidence grade A): HUD FY2026 Small Area FMR for Texas ZIPs."
+    columns:
+      - {name: zip, tests: [not_null]}
+      - {name: safmr_rent, tests: [not_null]}
