@@ -1,0 +1,17 @@
+version: 2
+models:
+  - name: all_signals
+    description: "Every signal in one shape: entity, value, band, grade, lineage."
+    columns:
+      - {name: entity_id, tests: [not_null]}
+      - {name: signal_id, tests: [not_null]}
+      - name: value
+        tests:
+          - not_null:
+              config:
+                where: "band <> 'insufficient_history'"
+      - {name: band, tests: [not_null]}
+      - {name: lineage_ref, tests: [not_null]}
+      - name: evidence_grade
+        tests:
+          - accepted_values: {values: ['A', 'B', 'C']}

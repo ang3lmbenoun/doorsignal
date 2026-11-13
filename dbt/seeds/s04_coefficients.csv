@@ -1,0 +1,11 @@
+term,value
+intercept,0.460971
+b_has_early_wo,0.057794
+b_delay_ln_hours,0.601253
+b_early_priority,-0.110189
+b_offer_z,0.64025
+center_ln_delay,2.449923
+center_offer_pct,0.057088
+scale_offer_pct,0.02
+n_train,787.0
+n_moved_out,462.0

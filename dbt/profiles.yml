@@ -11,3 +11,6 @@ doorsignal:
       schema: staging
       sslmode: "{{ env_var('PGSSLMODE', 'require') }}"
       threads: 4
+      connect_timeout: 15
+      keepalives_idle: 30
+      retries: 2

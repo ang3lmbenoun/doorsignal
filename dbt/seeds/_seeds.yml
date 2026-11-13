@@ -1,0 +1,11 @@
+version: 2
+seeds:
+  - name: signal_registry
+    description: "One row per signal: inputs, threshold, evidence grade, action tier and failure modes."
+    columns:
+      - {name: signal_id, tests: [unique, not_null]}
+      - name: evidence_grade
+        tests:
+          - accepted_values: {values: ['A', 'B', 'C']}
+  - name: s04_coefficients
+    description: "Renewal-risk model terms written by python -m signals.fit_s04."

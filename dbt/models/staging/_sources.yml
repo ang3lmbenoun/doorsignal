@@ -14,3 +14,7 @@ sources:
       - name: sim_work_orders
       - name: sim_ledger_entries
       - name: ref_hud_safmr
+  - name: ops
+    schema: ops
+    tables:
+      - name: load_log

@@ -1,10 +1,11 @@
 name: doorsignal
-version: "0.2.0"
+version: "0.3.0"
 config-version: 2
 profile: doorsignal
 model-paths: ["models"]
 macro-paths: ["macros"]
 test-paths: ["tests"]
+seed-paths: ["seeds"]
 target-path: "target"
 clean-targets: ["target", "dbt_packages"]
 
@@ -18,3 +19,16 @@ models:
     marts:
       +schema: marts
       +materialized: table
+    signals:
+      +schema: signals
+      +materialized: table
+
+seeds:
+  doorsignal:
+    +schema: signals
+
+vars:
+  as_of_date: "2026-10-31"
+  s02_min_baseline: 20
+  s08_min_recent: 5
+  s08_min_baseline: 10

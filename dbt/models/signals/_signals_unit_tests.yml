@@ -1,0 +1,258 @@
+version: 2
+unit_tests:
+  - name: s01_fires_at_seven_days_not_before
+    model: s01_texas_repair_clock
+    overrides: {vars: {as_of_date: '2026-01-09'}}
+    given:
+      - input: ref('fct_work_orders')
+        rows:
+          - {work_order_id: A, unit_id: U1, severity: routine, submitted_at: '2026-01-03 00:00:00', completed_at: null, is_written_notice: true}
+          - {work_order_id: B, unit_id: U1, severity: routine, submitted_at: '2026-01-03 00:01:00', completed_at: null, is_written_notice: true}
+          - {work_order_id: C, unit_id: U1, severity: emergency, submitted_at: '2026-01-08 00:00:00', completed_at: null, is_written_notice: true}
+          - {work_order_id: D, unit_id: U1, severity: routine, submitted_at: '2026-01-09 12:00:00', completed_at: null, is_written_notice: true}
+          - {work_order_id: E, unit_id: U1, severity: routine, submitted_at: '2025-12-01 00:00:00', completed_at: null, is_written_notice: false}
+          - {work_order_id: F, unit_id: U1, severity: routine, submitted_at: '2025-12-01 00:00:00', completed_at: '2026-01-02 00:00:00', is_written_notice: true}
+    expect:
+      rows:
+        - {entity_id: A, value: '7.000', band: breach_presumed}
+        - {entity_id: B, value: 6.999, band: at_risk}
+        - {entity_id: C, value: '2.000', band: emergency_watch}
+        - {entity_id: D, value: '0.500', band: ok}
+
+  - name: s02_flags_slow_assignment_vs_baseline
+    model: s02_assignment_delay
+    overrides: {vars: {as_of_date: '2026-03-01', s02_min_baseline: 3}}
+    given:
+      - input: ref('fct_work_orders')
+        rows:
+          - {work_order_id: W1, unit_id: U1, vendor_id: V1, category: plumbing, severity: routine, submitted_at: '2026-02-20 08:00:00', assigned_at: '2026-02-20 12:00:00', assign_hours: 4}
+          - {work_order_id: W2, unit_id: U1, vendor_id: V1, category: plumbing, severity: routine, submitted_at: '2026-02-20 08:00:00', assigned_at: '2026-02-20 12:00:00', assign_hours: 4}
+          - {work_order_id: W3, unit_id: U1, vendor_id: V1, category: plumbing, severity: routine, submitted_at: '2026-02-20 08:00:00', assigned_at: '2026-02-20 12:00:00', assign_hours: 4}
+          - {work_order_id: W4, unit_id: U1, vendor_id: V1, category: plumbing, severity: routine, submitted_at: '2026-02-20 08:00:00', assigned_at: '2026-02-20 12:00:00', assign_hours: 4}
+          - {work_order_id: W5, unit_id: U1, vendor_id: V1, category: plumbing, severity: routine, submitted_at: '2026-02-20 08:00:00', assigned_at: '2026-02-20 12:00:00', assign_hours: 4}
+          - {work_order_id: W6, unit_id: U1, vendor_id: V1, category: plumbing, severity: routine, submitted_at: '2026-02-20 08:00:00', assigned_at: '2026-02-20 12:00:00', assign_hours: 4}
+          - {work_order_id: W7, unit_id: U1, vendor_id: V1, category: plumbing, severity: routine, submitted_at: '2026-02-20 08:00:00', assigned_at: '2026-02-23 00:00:00', assign_hours: 64}
+          - {work_order_id: X1, unit_id: U2, vendor_id: V1, category: hvac, severity: routine, submitted_at: '2026-02-20 08:00:00', assigned_at: '2026-02-20 12:00:00', assign_hours: 4}
+    expect:
+      rows:
+        - {entity_id: W7, band: high}
+        - {entity_id: W1, band: normal}
+        - {entity_id: W2, band: normal}
+        - {entity_id: W3, band: normal}
+        - {entity_id: W4, band: normal}
+        - {entity_id: W5, band: normal}
+        - {entity_id: W6, band: normal}
+        - {entity_id: X1, band: insufficient_baseline}
+
+  - name: s03_scores_first_90_days
+    model: s03_first_90_day_experience
+    overrides: {vars: {as_of_date: '2026-03-01'}}
+    given:
+      - input: ref('fct_leases')
+        rows:
+          - {lease_id: L1, unit_id: U1, start_date: '2026-02-01'}
+          - {lease_id: L2, unit_id: U2, start_date: '2026-02-01'}
+          - {lease_id: L3, unit_id: U3, start_date: '2025-11-01'}
+          - {lease_id: L4, unit_id: U4, start_date: '2026-02-01'}
+      - input: ref('fct_work_orders')
+        rows:
+          - {work_order_id: W1, lease_id: L1, severity: urgent, submitted_at: '2026-02-10 08:00:00', assigned_at: '2026-02-10 18:00:00', completed_at: null, assign_hours: 10}
+          - {work_order_id: W4, lease_id: L4, severity: routine, submitted_at: '2026-02-10 08:00:00', assigned_at: '2026-02-11 04:00:00', completed_at: '2026-02-12 00:00:00', assign_hours: 20}
+    expect:
+      rows:
+        - {entity_id: L1, value: '40.00', band: at_risk}
+        - {entity_id: L2, value: '100.00', band: good}
+        - {entity_id: L4, value: '75.00', band: watch}
+
+  - name: s04_scores_renewal_risk_without_future_offer
+    model: s04_renewal_risk
+    overrides: {vars: {as_of_date: '2026-01-30'}}
+    given:
+      - input: ref('s04_coefficients')
+        rows:
+          - {term: intercept, value: 0}
+          - {term: b_has_early_wo, value: 0}
+          - {term: b_delay_ln_hours, value: 1}
+          - {term: b_early_priority, value: 1}
+          - {term: b_offer_z, value: 0.5}
+          - {term: center_ln_delay, value: 2}
+          - {term: center_offer_pct, value: 0.04}
+          - {term: scale_offer_pct, value: 0.02}
+      - input: ref('fct_leases')
+        rows:
+          - {lease_id: A, start_date: '2025-03-30', end_date: '2026-03-30', early_wo_count: 1, early_avg_ln_assign_hours: 3.0, early_has_priority: true}
+          - {lease_id: B, start_date: '2025-05-15', end_date: '2026-05-15', early_wo_count: 0, early_has_priority: false}
+          - {lease_id: C, start_date: '2025-09-30', end_date: '2026-09-30', early_wo_count: 0, early_has_priority: false}
+          - {lease_id: D, start_date: '2025-04-15', end_date: '2026-04-15', early_wo_count: 0, early_has_priority: false}
+      - input: ref('stg_lease_events')
+        rows:
+          - {event_id: E1, lease_id: A, event_date: '2026-01-01', event_type: renewal_offer, value_numeric: 0.06}
+          - {event_id: E2, lease_id: D, event_date: '2026-02-01', event_type: renewal_offer, value_numeric: 0.10}
+    expect:
+      rows:
+        - {entity_id: A, value: 0.9241, band: high}
+        - {entity_id: B, value: '0.5000', band: medium}
+        - {entity_id: D, value: '0.5000', band: medium}
+
+  - name: s05_detects_payments_getting_later
+    model: s05_payment_timing_shift
+    overrides: {vars: {as_of_date: '2026-06-30'}}
+    given:
+      - input: ref('fct_leases')
+        rows:
+          - {lease_id: L1, start_date: '2026-01-01', end_date: '2027-01-01'}
+          - {lease_id: L2, start_date: '2026-01-01', end_date: '2027-01-01'}
+      - input: ref('fct_ledger_entries')
+        rows:
+          - {entry_id: E01, lease_id: L1, entry_date: '2026-02-01', entry_type: charge_rent, amount: 1000}
+          - {entry_id: E02, lease_id: L1, entry_date: '2026-02-01', entry_type: payment, amount: -1000}
+          - {entry_id: E03, lease_id: L1, entry_date: '2026-03-01', entry_type: charge_rent, amount: 1000}
+          - {entry_id: E04, lease_id: L1, entry_date: '2026-03-01', entry_type: payment, amount: -1000}
+          - {entry_id: E05, lease_id: L1, entry_date: '2026-05-01', entry_type: charge_rent, amount: 1000}
+          - {entry_id: E06, lease_id: L1, entry_date: '2026-05-08', entry_type: payment, amount: -1000}
+          - {entry_id: E07, lease_id: L1, entry_date: '2026-06-01', entry_type: charge_rent, amount: 1000}
+          - {entry_id: E08, lease_id: L1, entry_date: '2026-06-05', entry_type: payment, amount: -1000}
+          - {entry_id: E09, lease_id: L2, entry_date: '2026-06-01', entry_type: charge_rent, amount: 1000}
+          - {entry_id: E10, lease_id: L2, entry_date: '2026-06-02', entry_type: payment, amount: -1000}
+    expect:
+      rows:
+        - {entity_id: L1, value: '5.50', band: shifting_late}
+
+  - name: s06_ages_open_balance_first_in_first_out
+    model: s06_delinquency_aging
+    overrides: {vars: {as_of_date: '2026-06-30'}}
+    given:
+      - input: ref('fct_leases')
+        rows:
+          - {lease_id: L1, start_date: '2026-01-01', end_date: '2027-01-01'}
+          - {lease_id: L2, start_date: '2026-01-01', end_date: '2027-01-01'}
+          - {lease_id: L3, start_date: '2026-01-01', end_date: '2027-01-01'}
+      - input: ref('fct_ledger_entries')
+        rows:
+          - {entry_id: E01, lease_id: L1, entry_date: '2026-04-01', entry_type: charge_rent, amount: 1000}
+          - {entry_id: E02, lease_id: L1, entry_date: '2026-04-02', entry_type: payment, amount: -1000}
+          - {entry_id: E03, lease_id: L1, entry_date: '2026-05-01', entry_type: charge_rent, amount: 1000}
+          - {entry_id: E04, lease_id: L1, entry_date: '2026-06-01', entry_type: charge_rent, amount: 1000}
+          - {entry_id: E05, lease_id: L2, entry_date: '2026-06-01', entry_type: charge_rent, amount: 1000}
+          - {entry_id: E06, lease_id: L2, entry_date: '2026-06-02', entry_type: payment, amount: -1000}
+          - {entry_id: E07, lease_id: L3, entry_date: '2026-06-29', entry_type: charge_rent, amount: 1000}
+    expect:
+      rows:
+        - {entity_id: L1, value: '2000.00', band: '31-60'}
+
+  - name: s07_counts_vacant_days_and_loss
+    model: s07_vacancy_loss
+    overrides: {vars: {as_of_date: '2026-02-15'}}
+    given:
+      - input: ref('fct_leases')
+        rows:
+          - {lease_id: L1, unit_id: U1, start_date: '2025-01-01', end_date: '2026-01-01', monthly_rent: 1500}
+          - {lease_id: L2, unit_id: U2, start_date: '2024-12-01', end_date: '2025-12-01', monthly_rent: 1000}
+          - {lease_id: L3, unit_id: U3, start_date: '2025-06-01', end_date: '2026-06-01', monthly_rent: 1200}
+    expect:
+      rows:
+        - {entity_id: U1, value: '2217.66', band: elevated}
+        - {entity_id: U2, value: '2496.92', band: high}
+
+  - name: s08_flags_peer_gap
+    model: s08_vendor_drift
+    overrides: {vars: {as_of_date: '2026-06-30'}}
+    given:
+      - input: ref('fct_work_orders')
+        rows:
+          - {work_order_id: A1, vendor_id: Va, category: hvac, severity: routine, completed_at: '2026-01-10 00:00:00', vendor_days: 10, cost: 100}
+          - {work_order_id: A2, vendor_id: Va, category: hvac, severity: routine, completed_at: '2026-01-11 00:00:00', vendor_days: 10, cost: 100}
+          - {work_order_id: B1, vendor_id: Vb, category: hvac, severity: routine, completed_at: '2026-01-10 00:00:00', vendor_days: 2, cost: 100}
+          - {work_order_id: B2, vendor_id: Vb, category: hvac, severity: routine, completed_at: '2026-01-11 00:00:00', vendor_days: 2, cost: 100}
+          - {work_order_id: C1, vendor_id: Vc, category: hvac, severity: routine, completed_at: '2026-01-10 00:00:00', vendor_days: 3, cost: 100}
+          - {work_order_id: C2, vendor_id: Vc, category: hvac, severity: routine, completed_at: '2026-01-11 00:00:00', vendor_days: 3, cost: 100}
+    expect:
+      rows:
+        - {entity_id: Va, band: slow_vs_peers}
+        - {entity_id: Vb, band: normal}
+        - {entity_id: Vc, band: normal}
+
+  - name: s08_flags_drift_against_own_baseline
+    model: s08_vendor_drift
+    overrides: {vars: {as_of_date: '2026-06-30', s08_min_recent: 2, s08_min_baseline: 3}}
+    given:
+      - input: ref('fct_work_orders')
+        rows:
+          - {work_order_id: X1, vendor_id: Vx, category: hvac, severity: routine, completed_at: '2026-01-10 00:00:00', vendor_days: 4, cost: 100}
+          - {work_order_id: X2, vendor_id: Vx, category: hvac, severity: routine, completed_at: '2026-01-11 00:00:00', vendor_days: 4, cost: 100}
+          - {work_order_id: X3, vendor_id: Vx, category: hvac, severity: routine, completed_at: '2026-01-12 00:00:00', vendor_days: 4, cost: 100}
+          - {work_order_id: X4, vendor_id: Vx, category: hvac, severity: routine, completed_at: '2026-06-01 00:00:00', vendor_days: 8, cost: 100}
+          - {work_order_id: X5, vendor_id: Vx, category: hvac, severity: routine, completed_at: '2026-06-02 00:00:00', vendor_days: 8, cost: 100}
+          - {work_order_id: Y1, vendor_id: Vy, category: hvac, severity: routine, completed_at: '2026-01-10 00:00:00', vendor_days: 4, cost: 100}
+          - {work_order_id: Y2, vendor_id: Vy, category: hvac, severity: routine, completed_at: '2026-01-11 00:00:00', vendor_days: 4, cost: 100}
+          - {work_order_id: Y3, vendor_id: Vy, category: hvac, severity: routine, completed_at: '2026-01-12 00:00:00', vendor_days: 4, cost: 100}
+          - {work_order_id: Y4, vendor_id: Vy, category: hvac, severity: routine, completed_at: '2026-06-01 00:00:00', vendor_days: 4, cost: 100}
+          - {work_order_id: Y5, vendor_id: Vy, category: hvac, severity: routine, completed_at: '2026-06-02 00:00:00', vendor_days: 4, cost: 100}
+    expect:
+      rows:
+        - {entity_id: Vx, band: drifting}
+        - {entity_id: Vy, band: normal}
+
+  - name: s09_marks_repeat_and_chronic_requests
+    model: s09_repeat_issue
+    overrides: {vars: {as_of_date: '2026-06-25'}}
+    given:
+      - input: ref('fct_work_orders')
+        rows:
+          - {work_order_id: W1, unit_id: U1, category: hvac, submitted_at: '2026-06-01 00:00:00'}
+          - {work_order_id: W2, unit_id: U1, category: hvac, submitted_at: '2026-06-10 00:00:00'}
+          - {work_order_id: W3, unit_id: U1, category: hvac, submitted_at: '2026-06-20 00:00:00'}
+          - {work_order_id: W4, unit_id: U2, category: plumbing, submitted_at: '2026-06-15 00:00:00'}
+          - {work_order_id: W5, unit_id: U1, category: plumbing, submitted_at: '2026-06-21 00:00:00'}
+    expect:
+      rows:
+        - {entity_id: W2, value: 1, band: repeat}
+        - {entity_id: W3, value: 2, band: chronic}
+
+  - name: s12_row_drift_flags_big_change
+    model: s12_row_drift
+    given:
+      - input: source('ops', 'load_log')
+        rows:
+          - {load_id: 1, loaded_at: '2026-06-01 00:00:00', table_name: t1, row_count: 1000}
+          - {load_id: 2, loaded_at: '2026-06-02 00:00:00', table_name: t1, row_count: 1200}
+          - {load_id: 3, loaded_at: '2026-06-01 00:00:00', table_name: t2, row_count: 1000}
+          - {load_id: 4, loaded_at: '2026-06-02 00:00:00', table_name: t2, row_count: 1000}
+          - {load_id: 5, loaded_at: '2026-06-02 00:00:00', table_name: t3, row_count: 500}
+    expect:
+      rows:
+        - {entity_id: t1, value: '0.2000', band: drift}
+        - {entity_id: t2, value: '0.0000', band: ok}
+        - {entity_id: t3, value: null, band: insufficient_history}
+
+  - name: s12_null_rate_flags_breach
+    model: s12_null_rate
+    given:
+      - input: ref('fct_leases')
+        rows:
+          - {lease_id: L1, safmr_rent: 1500, monthly_rent: 1400}
+          - {lease_id: L2, safmr_rent: null, monthly_rent: 1300}
+      - input: ref('fct_work_orders')
+        rows:
+          - {work_order_id: W1, assigned_at: '2026-06-01 00:00:00'}
+          - {work_order_id: W2, assigned_at: null}
+    expect:
+      rows:
+        - {entity_id: marts.fct_leases.safmr_rent, value: '0.5000', band: breach}
+        - {entity_id: marts.fct_leases.monthly_rent, value: '0.0000', band: ok}
+        - {entity_id: marts.fct_work_orders.assigned_at, value: '0.5000', band: breach}
+
+  - name: s12_staleness_flags_old_data
+    model: s12_staleness
+    overrides: {vars: {as_of_date: '2026-06-30'}}
+    given:
+      - input: ref('fct_work_orders')
+        rows:
+          - {work_order_id: W1, submitted_at: '2026-06-10 08:00:00'}
+      - input: ref('fct_ledger_entries')
+        rows:
+          - {entry_id: E1, entry_date: '2026-06-25'}
+    expect:
+      rows:
+        - {entity_id: marts.fct_work_orders, value: 20, band: stale}
+        - {entity_id: marts.fct_ledger_entries, value: 5, band: fresh}
