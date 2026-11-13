@@ -16,7 +16,8 @@ lease as (
 select
     s.scenario_id, l.lease_id, l.owner_id, l.zip,
     case when l.p_nonrenew is null then null
-         else 1 / (1 + exp(-(ln(l.p_nonrenew / (1 - l.p_nonrenew))
+         else 1 / (1 + exp(-(ln(least(greatest(l.p_nonrenew, 1e-6), 1 - 1e-6)
+                              / (1 - least(greatest(l.p_nonrenew, 1e-6), 1 - 1e-6)))
                               + case when l.had_early_wo then c.b_delay * ln(s.delay_multiplier) else 0 end)))
     end as p_nonrenew,
     p.mean_turnover_cost + (p.mean_vacancy_days + s.extra_vacancy_days) * l.monthly_rent / 30.4375

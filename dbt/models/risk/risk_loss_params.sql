@@ -23,6 +23,7 @@ lgd as (
 select
     s.n_moved_out, s.mean_turnover_cost, s.mean_vacancy_days,
     g.n_delinquent_leases, g.unrecovered_rent, g.delinquent_rent,
+    g.unrecovered_rent / nullif(g.delinquent_rent, 0) as lgd_raw,
     least(greatest(g.unrecovered_rent / nullif(g.delinquent_rent, 0), 0), 1) as lgd,
     {{ as_of_ts() }} as computed_at
 from sev s cross join lgd g

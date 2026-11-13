@@ -21,7 +21,7 @@ Expect `Done. PASS=91 WARN=0 ERROR=0`. Needs `data/reference/fy2026_safmrs_revis
 
 ## M4: risk layer
 ```
-python -m ingest.run_dbt build      # expect Done. PASS=171 (risk schema included)
+python -m ingest.run_dbt build      # expect Done. PASS=180 (risk schema included)
 python -m risk.backtest             # writes docs/risk/backtest.md and calibration_table.csv
 python -m risk.scenarios            # writes docs/risk/scenario_run.md
 ```

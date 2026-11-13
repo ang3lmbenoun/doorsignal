@@ -58,6 +58,10 @@ def nonrenewal_backtest(leases: pd.DataFrame, split: pd.Timestamp = SPLIT, group
     df = leases[leases["outcome"] != "open"].copy()
     df["end_date"] = pd.to_datetime(df["end_date"])
     train, test = df[df["end_date"] < split], df[df["end_date"] >= split]
+    if len(train) < 50 or len(test) < 20 or (train["outcome"] == "moved_out").sum() == 0:
+        raise ValueError(
+            f"too few decided leases for a backtest: train={len(train)} test={len(test)}"
+        )
     X, y, c_delay, c_offer = build_design(train)
     beta, _ = fit_logistic(X, y)
     Xt, yt, _, _ = build_design(test, center_delay=c_delay, center_offer=c_offer)

@@ -4,6 +4,9 @@ models:
     description: "Qualitative register. Likelihood and impact are judgment inputs, not measurements."
     columns:
       - {name: risk_id, tests: [unique, not_null]}
+      - {name: category, tests: [not_null]}
+      - {name: owner_role, tests: [not_null]}
+      - {name: review_date, tests: [not_null]}
       - name: likelihood
         tests:
           - accepted_values: {values: [1, 2, 3, 4, 5], quote: false}
@@ -38,6 +41,9 @@ models:
     description: "Every active lease under every scenario in the risk_scenarios seed."
     columns:
       - {name: scenario_id, tests: [not_null]}
+      - {name: pd_delinquency, tests: [not_null]}
+      - {name: ead, tests: [not_null]}
+      - {name: lgd, tests: [not_null]}
   - name: stress_summary
     description: "Portfolio expected loss by scenario and change versus base."
     columns:

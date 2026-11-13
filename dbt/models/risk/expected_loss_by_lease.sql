@@ -41,12 +41,12 @@ select
     coalesce(j.p_nonrenew, 0)
         * (p.mean_turnover_cost + p.mean_vacancy_days * j.monthly_rent / 30.4375) as el_nonrenewal,
     j.late_bucket,
-    sc.pd as pd_delinquency,
+    coalesce(sc.pd, 0) as pd_delinquency,
     j.monthly_rent + j.open_balance as ead,
     p.lgd,
-    sc.pd * (j.monthly_rent + j.open_balance) * p.lgd as el_delinquency,
+    coalesce(sc.pd, 0) * (j.monthly_rent + j.open_balance) * p.lgd as el_delinquency,
     coalesce(j.p_nonrenew, 0) * (p.mean_turnover_cost + p.mean_vacancy_days * j.monthly_rent / 30.4375)
-        + sc.pd * (j.monthly_rent + j.open_balance) * p.lgd as el_total,
+        + coalesce(sc.pd, 0) * (j.monthly_rent + j.open_balance) * p.lgd as el_total,
     'C' as evidence_grade,
     'signals.s04_renewal_risk + signals.s06_delinquency_aging + risk.delinquency_pd_scorecard + risk.risk_loss_params -> risk.expected_loss_by_lease' as lineage_ref,
     {{ as_of_ts() }} as computed_at
