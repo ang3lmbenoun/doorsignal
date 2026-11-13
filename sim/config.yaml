@@ -1,0 +1,105 @@
+# DoorSignal simulator config (v0).
+# Every parameter states its basis:
+#   "benchmark: <source>"  calibrated to a published number (evidence grade B)
+#   "assumption"           our choice, no published anchor (evidence grade C)
+# Published benchmarks come from vendor reports (Property Meld, Buildium, BiggerPockets); they are unaudited.
+seed: 20261112
+
+calendar:
+  sim_start: 2023-01-01
+  sim_end: 2026-10-31
+
+portfolio:
+  n_owners: {value: 6, basis: assumption}
+  n_properties: {value: 25, basis: assumption}
+  n_vendors: {value: 12, basis: assumption}
+  owner_spend_limits: {value: [250, 500, 750], basis: assumption}
+  mgmt_fee_pct_options: {value: [0.08, 0.09, 0.10], basis: "benchmark: 8-12% of rent is the commonly quoted fee range (BiggerPockets)"}
+  year_built_range: {value: [1965, 2020], basis: assumption}
+  sqft_by_beds: {value: {0: 480, 1: 650, 2: 900, 3: 1250, 4: 1550}, basis: assumption}
+  property_types:
+    sfr: {share: 0.30, units: [1, 1], beds: {2: 0.15, 3: 0.55, 4: 0.30}}
+    small_mf: {share: 0.40, units: [4, 12], beds: {1: 0.30, 2: 0.55, 3: 0.15}}
+    apartment: {share: 0.30, units: [24, 48], beds: {0: 0.10, 1: 0.40, 2: 0.40, 3: 0.10}}
+
+zips:
+  basis: "assumption: ZIP choice and area labels are approximate, verify against the HUD file. rent_multiplier is used only when no HUD file is loaded."
+  items:
+    - {zip: "76117", area_label: "Haltom City / NE Fort Worth", rent_multiplier: 0.95, weight: 0.25}
+    - {zip: "76010", area_label: "Arlington", rent_multiplier: 1.00, weight: 0.20}
+    - {zip: "75061", area_label: "Irving", rent_multiplier: 1.05, weight: 0.20}
+    - {zip: "76116", area_label: "Fort Worth west", rent_multiplier: 1.02, weight: 0.20}
+    - {zip: "75216", area_label: "Dallas Oak Cliff", rent_multiplier: 0.90, weight: 0.15}
+
+market:
+  placeholder_base_rent_by_beds: {value: {0: 1000, 1: 1200, 2: 1500, 3: 1850, 4: 2200}, basis: "assumption PLACEHOLDER, replaced by HUD SAFMR by ZIP and bedroom when data/reference/fy2026_safmrs_revised.xlsx is present"}
+  market_to_safmr_ratio: {value: 1.0, basis: assumption}
+  unit_rent_noise_sd: {value: 0.07, basis: assumption}
+  annual_drift: {value: 0.03, basis: assumption}
+  new_lease_noise_sd: {value: 0.03, basis: assumption}
+
+tenants:
+  reliability_beta: {value: [8.0, 1.2], basis: assumption}
+
+leases:
+  term_months: {value: 12, basis: assumption}
+  renewal_offer_lead_days: {value: 90, basis: "assumption; Buildium renters report suggests outreach 90-120 days before expiry"}
+  offered_increase_mean: {value: 0.04, basis: assumption}
+  offered_increase_sd: {value: 0.02, basis: assumption}
+  offered_increase_max: {value: 0.12, basis: assumption}
+
+vacancy:
+  median_days: {value: 28, basis: assumption}
+  sigma: {value: 0.5, basis: assumption}
+
+turnover:
+  cost_median: {value: 3800, basis: "assumption inside published ranges: Property Meld $4,200-6,800 per churned lease (vendor); Zillow $1,000-5,000+ as quoted by ShowDigs"}
+  cost_sigma: {value: 0.35, basis: assumption}
+  cost_min: {value: 1500, basis: assumption}
+  cost_max: {value: 9000, basis: assumption}
+
+work_orders:
+  rate_per_unit_month: {value: 0.3296, basis: "benchmark: Property Meld Sept 2025, 37.2% of new residents file no request in first 90 days, Poisson rate = -ln(0.372)/3"}
+  age_slope_per_year: {value: 0.004, basis: assumption}
+  category_weights: {value: {hvac: 0.26, plumbing: 0.22, electrical: 0.08, appliance: 0.20, pest: 0.06, flooring_paint: 0.08, other: 0.10}, basis: assumption}
+  hvac_peak_months: {value: [12, 1, 2, 6, 7, 8, 9], basis: assumption}
+  hvac_peak_multiplier: {value: 1.8, basis: assumption}
+  severity_probs: {value: {hvac: [0.55, 0.30, 0.15], plumbing: [0.50, 0.33, 0.17], electrical: [0.60, 0.28, 0.12], appliance: [0.78, 0.20, 0.02], pest: [0.85, 0.14, 0.01], flooring_paint: [0.90, 0.10, 0.0], other: [0.80, 0.18, 0.02]}, basis: "assumption; order is routine, urgent, emergency"}
+  written_notice_share: {value: 0.70, basis: assumption}
+  assign_delay_median_hours: {value: 14.0, basis: assumption}
+  assign_delay_sigma: {value: 0.9, basis: assumption}
+  assign_severity_multiplier: {value: {routine: 1.0, urgent: 0.6, emergency: 0.2}, basis: assumption}
+  completion_median_days: {value: {routine: 4.9, urgent: 1.7, emergency: 0.5}, basis: "assumption tuned so mean submit-to-complete is near the Property Meld Sept 2025 repair speed of about 7.0 days (vendor)"}
+  completion_sigma: {value: 0.8, basis: assumption}
+  vendor_speed_sd: {value: 0.25, basis: assumption}
+  planted_slow_vendor: {value: {vendor_id: "V03", speed_factor: 2.2}, basis: "planted effect, recorded in ground_truth"}
+  satisfaction_intercept: {value: 4.9, basis: "assumption tuned to Property Meld Sept 2025 mean satisfaction 4.45 of 5 (vendor)"}
+  satisfaction_slope_per_day: {value: 0.06, basis: assumption}
+  satisfaction_noise_sd: {value: 0.5, basis: assumption}
+  survey_response_rate: {value: 0.6, basis: assumption}
+  cost_median_by_category: {value: {hvac: 280, plumbing: 220, electrical: 180, appliance: 150, pest: 90, flooring_paint: 260, other: 120}, basis: assumption}
+  cost_sigma: {value: 0.6, basis: assumption}
+  emergency_cost_multiplier: {value: 1.6, basis: assumption}
+
+renewal:
+  baseline_logit: {value: 0.35, basis: "assumption; implies a renewal rate near 55-60 percent, replace with a real manager's figure"}
+  b_assign_delay_z: {value: -0.55, basis: "planted; direction follows Property Meld (slower assignment, more churn), magnitude is an assumption"}
+  b_early_priority: {value: -0.45, basis: "planted; direction follows Property Meld (early urgent/emergency issues hurt renewal), magnitude is an assumption"}
+  b_rent_gap_z: {value: -0.70, basis: "planted; magnitude is an assumption"}
+  b_price_sensitivity: {value: -0.60, basis: "planted; unobserved tenant trait (hidden confounder, never in raw data)"}
+  delay_ref_mu: {value: 2.4, basis: "reference constant: ln(hours), used to build the delay z-score"}
+  delay_ref_sigma: {value: 1.0, basis: "reference constant"}
+  early_window_days: {value: 90, basis: "benchmark: Property Meld, first 90 days of a lease"}
+
+payments:
+  grace_days: {value: 3, basis: assumption}
+  late_fee_pct: {value: 0.05, basis: assumption}
+  p_miss_base: {value: 0.015, basis: assumption}
+  p_miss_slope: {value: 0.20, basis: assumption}
+  p_late_slope: {value: 1.2, basis: assumption}
+  catchup_prob: {value: 0.8, basis: assumption}
+
+benchmark_checks:
+  repair_days: {target: 7.0, tolerance: 1.0, source: "Property Meld Sept 2025 (vendor)"}
+  satisfaction: {target: 4.45, tolerance: 0.15, source: "Property Meld Sept 2025 (vendor)"}
+  zero_request_share_first90: {target: 0.372, tolerance: 0.06, source: "Property Meld Sept 2025 (vendor)"}

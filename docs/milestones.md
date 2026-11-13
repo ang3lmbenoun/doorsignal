@@ -11,4 +11,4 @@
 | M6 | Tableau dashboards, README, demo | Another person runs it from README |
 | M7 | Fair-housing audit harness, renewal ranker, narrators | Planted disparity detected; null scenario not flagged |
 
-Current: M0 (scaffold done; waiting on Neon connection check + first green CI run)
+Current: M1 (simulator + raw load built; waiting on Neon load run by Angel)
