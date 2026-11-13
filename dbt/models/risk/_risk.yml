@@ -1,0 +1,45 @@
+version: 2
+models:
+  - name: risk_register
+    description: "Qualitative register. Likelihood and impact are judgment inputs, not measurements."
+    columns:
+      - {name: risk_id, tests: [unique, not_null]}
+      - name: likelihood
+        tests:
+          - accepted_values: {values: [1, 2, 3, 4, 5], quote: false}
+      - name: impact
+        tests:
+          - accepted_values: {values: [1, 2, 3, 4, 5], quote: false}
+  - name: risk_loss_params
+    description: "Mean turnover cost, mean vacancy days and LGD, estimated from data on or before the snapshot date."
+    columns:
+      - {name: mean_turnover_cost, tests: [not_null]}
+      - {name: mean_vacancy_days, tests: [not_null]}
+      - {name: lgd, tests: [not_null]}
+  - name: delinquency_pd_panel
+    description: "Lease-month observations with closed label windows. No future information."
+    columns:
+      - {name: lease_id, tests: [not_null]}
+      - name: late_bucket
+        tests:
+          - accepted_values: {values: ['0', '1', '2', '3+']}
+  - name: delinquency_pd_scorecard
+    description: "Observed probability of a late fee in the next horizon days, by trailing late-fee bucket."
+    columns:
+      - {name: late_bucket, tests: [unique, not_null]}
+      - {name: pd, tests: [not_null]}
+  - name: expected_loss_by_lease
+    description: "Expected loss per active lease: non-renewal loss plus delinquency loss."
+    columns:
+      - {name: lease_id, tests: [unique, not_null]}
+      - {name: el_total, tests: [not_null]}
+      - {name: lineage_ref, tests: [not_null]}
+  - name: stress_results
+    description: "Every active lease under every scenario in the risk_scenarios seed."
+    columns:
+      - {name: scenario_id, tests: [not_null]}
+  - name: stress_summary
+    description: "Portfolio expected loss by scenario and change versus base."
+    columns:
+      - {name: scenario_id, tests: [unique, not_null]}
+      - {name: el_total, tests: [not_null]}

@@ -1,5 +1,5 @@
 name: doorsignal
-version: "0.3.0"
+version: "0.4.0"
 config-version: 2
 profile: doorsignal
 model-paths: ["models"]
@@ -22,13 +22,23 @@ models:
     signals:
       +schema: signals
       +materialized: table
+    risk:
+      +schema: risk
+      +materialized: table
 
 seeds:
   doorsignal:
     +schema: signals
+    risk_register_input:
+      +schema: risk
+    risk_scenarios:
+      +schema: risk
 
 vars:
   as_of_date: "2026-10-31"
   s02_min_baseline: 20
   s08_min_recent: 5
   s08_min_baseline: 10
+  risk_pd_horizon_days: 90
+  risk_lookback_days: 180
+  risk_min_bucket_n: 30

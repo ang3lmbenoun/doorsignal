@@ -1,0 +1,10 @@
+model,group,n,predicted,observed,gap
+nonrenewal,Q1,75,0.2393,0.28,0.0407
+nonrenewal,Q2,74,0.441,0.3243,-0.1166
+nonrenewal,Q3,75,0.6131,0.5467,-0.0664
+nonrenewal,Q4,74,0.7621,0.7432,-0.0189
+nonrenewal,Q5,74,0.9027,0.8784,-0.0243
+delinquency_pd,late_0,1358,0.2633,0.2577,-0.0056
+delinquency_pd,late_1,599,0.3821,0.4274,0.0453
+delinquency_pd,late_2,240,0.5084,0.5583,0.0499
+delinquency_pd,late_3+,108,0.687,0.713,0.026
