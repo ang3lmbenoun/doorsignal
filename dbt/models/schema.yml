@@ -1,0 +1,9 @@
+version: 2
+models:
+  - name: ping
+    description: "M0 health check model."
+    columns:
+      - name: ok
+        tests:
+          - not_null
+          - unique
