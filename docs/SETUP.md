@@ -1,6 +1,6 @@
 # Setup (Windows PowerShell)
 
-1. `cd C:\Users\megan\projects\doorsignal`
+1. `cd C:\dev\doorsignal`
 2. `python -m venv .venv` then `.venv\Scripts\Activate.ps1`
 3. `pip install -r requirements-dev.txt`
 4. `copy .env.example .env` and paste your Neon connection string into DATABASE_URL (never commit .env)
