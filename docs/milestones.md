@@ -11,5 +11,5 @@
 | M6 | Tableau dashboards, README, demo | Another person runs it from README |
 | M7 | Fair-housing audit harness, renewal ranker, narrators | Planted disparity detected; null scenario not flagged |
 
-Current: M4 built on branch `m4-risk-layer` and passing on local Postgres 16 (dbt PASS=180, pytest 25 passed). Waiting on Angel to review the PR and run it against Neon.
-Done: M0 (CI green), M1 (load clean in Neon), M2 (dbt PASS=91 in Neon), M3 (pushed; CI green; Neon build not yet confirmed).
+Current: M5a (API with row-level security), next up.
+Done: M0 (CI green), M1 (load clean in Neon), M2 (dbt PASS=91 in Neon), M3 (Neon build confirmed), M4 (merged; dbt PASS=180 in Neon; calibration table and reproducible scenario run in docs/risk/).
