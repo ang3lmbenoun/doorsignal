@@ -17,6 +17,8 @@ scoped as (
     from {{ ref('all_signals') }} s
     left join ent e on e.entity_type = s.entity_type and e.entity_id = s.entity_id::text
     where s.entity_type <> 'vendor'
+      -- S12 also watches the ground_truth tables. Their names and row counts are not served (M5a rule).
+      and s.entity_id::text not like 'ground\_truth.%'
 )
 select m.org_id, c.owner_id, c.entity_id, c.entity_type, c.signal_id, c.value, c.band, c.computed_at,
        c.evidence_grade, c.lineage_ref, c.detail

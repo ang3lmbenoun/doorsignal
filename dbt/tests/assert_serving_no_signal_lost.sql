@@ -1,6 +1,8 @@
 -- serving.all_signals keeps every non-vendor signal row and one vendor row per (org, vendor) that has work.
 -- A join that silently dropped rows would hide signals from every role.
+-- The only rows allowed to disappear are S12 checks on ground_truth tables (never served).
 select 'non_vendor_rows' as what, a.n as expected, b.n as served
-from (select count(*) as n from {{ ref('all_signals') }} where entity_type <> 'vendor') a,
+from (select count(*) as n from {{ ref('all_signals') }}
+      where entity_type <> 'vendor' and entity_id::text not like 'ground\_truth.%') a,
      (select count(*) as n from {{ ref('serving_all_signals') }} where entity_type <> 'vendor') b
 where a.n <> b.n

@@ -14,14 +14,16 @@ begin
         if not exists (select 1 from pg_roles where rolname = r) then
             execute format('create role %I nologin nosuperuser nocreatedb nocreaterole noinherit nobypassrls', r);
         end if;
-        -- Re-assert the safe attributes on every run.
-        execute format('alter role %I nologin nosuperuser nocreatedb nocreaterole noinherit nobypassrls', r);
+        -- Re-assert the attributes a non-superuser owner may change. SUPERUSER and BYPASSRLS can only be
+        -- changed by a superuser (Neon's owner is not one); CREATE ROLE above leaves both off, and the
+        -- leak tests assert it.
+        execute format('alter role %I nologin nocreatedb nocreaterole noinherit', r);
     end loop;
 
     if not exists (select 1 from pg_roles where rolname = 'api_login') then
         create role api_login login nosuperuser nocreatedb nocreaterole noinherit nobypassrls connection limit 20;
     end if;
-    alter role api_login login nosuperuser nocreatedb nocreaterole noinherit nobypassrls connection limit 20;
+    alter role api_login login nocreatedb nocreaterole noinherit connection limit 20;
 end $$;
 
 -- api_login may SET ROLE into each group role but inherits nothing from them.
@@ -52,3 +54,10 @@ begin
 end $$;
 revoke all on schema ground_truth from public;
 revoke all on all tables in schema ground_truth from public;
+
+-- The public schema: no API role may use it, directly or through PUBLIC. (Nothing in this project lives
+-- there; the dbt and ingest roles use their own schemas.)
+revoke all on schema public from public;
+revoke all on all tables in schema public from public;
+revoke all on schema public from api_login, api_owner, api_property_manager, api_maintenance_coordinator,
+    api_leasing_manager, api_data_owner;

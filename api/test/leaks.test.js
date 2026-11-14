@@ -95,6 +95,10 @@ async function runMatrix() {
     console.log(`\nLEAK MATRIX SUMMARY: cases=${stats.cases} cross_org_leaks=${stats.leaks}`);
   });
 
+  // A refusal to change identity: Postgres codes 42501 / 22023, or Neon's own wording for managed roles.
+  const isDenied = (e) =>
+    ['42501', '22023'].includes(e.code) || /not allowed to change role|permission denied|does not exist/.test(e.message);
+
   const gtTables = (
     await admin.query("select table_name from information_schema.tables where table_schema = 'ground_truth'")
   ).rows.map((r) => r.table_name);
@@ -337,7 +341,7 @@ async function runMatrix() {
         const name = target === '__owner__' ? adminUser() : target;
         const c = await apiClientFactory();
         try {
-          await assert.rejects(c.query(`SET ROLE "${name.replaceAll('"', '')}"`), (e) => ['42501', '22023'].includes(e.code));
+          await assert.rejects(c.query(`SET ROLE "${name.replaceAll('"', '')}"`), isDenied);
           const who = await c.query('select current_user as u');
           assert.equal(who.rows[0].u, 'api_login');
         } finally {
@@ -348,7 +352,8 @@ async function runMatrix() {
     kase('SET SESSION AUTHORIZATION fails', async () => {
       const c = await apiClientFactory();
       try {
-        await assert.rejects(c.query('SET SESSION AUTHORIZATION postgres'), (e) => e.code === '42501');
+        await assert.rejects(c.query(`SET SESSION AUTHORIZATION "${adminUser()}"`), isDenied);
+        await assert.rejects(c.query('SET SESSION AUTHORIZATION postgres'), isDenied);
       } finally {
         await c.end();
       }
