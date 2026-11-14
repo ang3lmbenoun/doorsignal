@@ -3,7 +3,7 @@
     python -m ingest.api_sql roles   # 30_api_roles.sql (once per database)
     python -m ingest.api_sql rls     # 31_serving_rls.sql (after every dbt build)
     python -m ingest.api_sql all
-    python -m ingest.api_sql password  # sets api_login's password from API_LOGIN_PASSWORD (never printed)
+    python -m ingest.api_sql password  # api_login password from API_LOGIN_PASSWORD (never printed)
 
 The target URL is read from the env var named by --url-env (default NEON_TEST_DATABASE_URL).
 The command refuses to run if that URL equals DATABASE_URL (the main Neon database): roles are
