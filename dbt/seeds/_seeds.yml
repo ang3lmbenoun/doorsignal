@@ -13,6 +13,11 @@ seeds:
     description: "Risk register rows. Likelihood and impact are judgment inputs (1-5)."
     columns:
       - {name: risk_id, tests: [unique, not_null]}
+  - name: org_map
+    description: "Assumed mapping of owner to management org, used for row-level security in the serving layer (basis: assumption, see sim/config.yaml)."
+    columns:
+      - {name: owner_id, tests: [unique, not_null]}
+      - {name: org_id, tests: [not_null]}
   - name: risk_scenarios
     description: "Stress scenario knobs: repair-time multiplier, extra vacancy days, PD multiplier."
     columns:

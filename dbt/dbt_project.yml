@@ -33,6 +33,8 @@ seeds:
       +schema: risk
     risk_scenarios:
       +schema: risk
+    org_map:
+      +schema: ops
 
 vars:
   as_of_date: "2026-10-31"
