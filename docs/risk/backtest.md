@@ -17,9 +17,9 @@ Fit on 415 decided leases that ended before 2025-07-01; scored 372 decided lease
 | Brier, true simulator probability (floor) | 0.1813 |
 | mean abs error vs true probability | 0.1114 |
 | correlation with true probability | 0.8798 |
-| predicted expected loss, test leases | 1,232,123 |
-| realized loss, test leases | 1,128,040 |
-| predicted / realized | 1.092 |
+| predicted expected loss, test leases | 1,297,348 |
+| realized loss, test leases | 1,186,884 |
+| predicted / realized | 1.093 |
 
 ## Delinquency PD scorecard, out of time
 Lookup built on 5430 lease-months through 2025-06-30; tested on 2305 lease-months from 2025-09-30.
