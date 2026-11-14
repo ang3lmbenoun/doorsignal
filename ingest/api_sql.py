@@ -3,6 +3,7 @@
     python -m ingest.api_sql roles   # 30_api_roles.sql (once per database)
     python -m ingest.api_sql rls     # 31_serving_rls.sql (after every dbt build)
     python -m ingest.api_sql all
+    python -m ingest.api_sql password  # sets api_login's password from API_LOGIN_PASSWORD (never printed)
 
 The target URL is read from the env var named by --url-env (default NEON_TEST_DATABASE_URL).
 The command refuses to run if that URL equals DATABASE_URL (the main Neon database): roles are
@@ -37,6 +38,16 @@ def role_exists(conn, name: str) -> bool:
     return conn.execute("select 1 from pg_roles where rolname = %s", (name,)).fetchone() is not None
 
 
+def set_password(conn) -> None:
+    from psycopg import sql
+
+    password = os.environ.get("API_LOGIN_PASSWORD", "")
+    if len(password) < 24:
+        raise ConfigError("API_LOGIN_PASSWORD is not set or shorter than 24 characters.")
+    conn.execute(sql.SQL("alter role api_login password {}").format(sql.Literal(password)))
+    print("api_login password set")
+
+
 def apply(conn, which: str) -> None:
     for key in (["roles", "rls"] if which == "all" else [which]):
         conn.execute((SQL_DIR / FILES[key]).read_text(encoding="utf-8"))
@@ -45,7 +56,7 @@ def apply(conn, which: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("which", choices=["roles", "rls", "all"])
+    ap.add_argument("which", choices=["roles", "rls", "all", "password"])
     ap.add_argument("--url-env", default="NEON_TEST_DATABASE_URL")
     args = ap.parse_args(argv)
     try:
@@ -54,7 +65,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"ERROR: {e}", file=sys.stderr)
         return 2
     with psycopg.connect(url, connect_timeout=15, autocommit=True) as conn:
-        apply(conn, args.which)
+        if args.which == "password":
+            set_password(conn)
+        else:
+            apply(conn, args.which)
     return 0
 
 

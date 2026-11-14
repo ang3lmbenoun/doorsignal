@@ -5,7 +5,7 @@ export const ENDPOINTS = [
   {
     path: '/v1/signals',
     table: 'all_signals',
-    orderBy: 'signal_id, entity_id',
+    orderBy: 'signal_id, entity_id, org_id, owner_id', // unique per row, so offset paging is stable
     idColumn: 'entity_id',
     filters: {
       signal_id: /^S\d{2}$/,
