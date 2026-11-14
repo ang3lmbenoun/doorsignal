@@ -32,23 +32,28 @@ S12 (data trust) rows have no owner or org, so only data_owner sees them. S12 ch
 4. The API role name comes from a fixed map; every request value is a bound parameter after a pattern check.
 
 ## Auth
-Bearer JWT, HS256 only, `exp` required, secret from `JWT_SECRET` (at least 32 characters). Claims: `role`, `org_id` (all roles except data_owner), `owner_id` (owner only). `org_id` and `owner_id` must match `^[A-Za-z0-9_-]{1,32}$`. A shared HS256 secret means anyone holding it can mint any role; real identity is out of scope for M5a (ADR 0003).
+Bearer JWT, HS256 only, secret from `JWT_SECRET` (at least 32 characters). Required: `exp`, `iat`, `iss` = `doorsignal`, `aud` = `doorsignal-api`; a token older than 1 hour is refused whatever its `exp` (5 s clock tolerance). Claims: `role`, `org_id` (all roles except data_owner), `owner_id` (owner only). `org_id` and `owner_id` must match `^[A-Za-z0-9_-]{1,32}$`. A shared HS256 secret means anyone holding it can mint any role; real identity is out of scope for M5a (ADR 0003).
 
 ## Responses
-`GET` only. `{ "rows": [...], "meta": { "count", "limit", "offset" } }`. Every row carries `evidence_grade` (A/B/C) and `lineage_ref`; the API returns 500 rather than a row without them. `limit` 1-500 (default 100), `offset`. Unknown query parameters give 400.
+`GET` only. `{ "rows": [...], "meta": { "count", "limit", "offset" } }`. Every row carries `evidence_grade` (A/B/C) and `lineage_ref`; the API returns 500 (and logs the table) rather than a row without them. Columns come from a reviewed list per endpoint (`api/src/endpoints.js`), not `SELECT *`. `limit` 1-500 (default 100), `offset` 0-100000. Unknown query parameters give 400.
 
 | Status | Meaning |
 |---|---|
 | 401 | missing, malformed, expired or forged token; role or claims invalid |
-| 403 | role has no grant on that table |
+| 403 | role has no grant on that table (logged with role and table; after a dbt rebuild that did not re-apply grants this is what every call returns, see `docs/runbook-api.md`) |
 | 404 | id does not exist or is not visible to the caller (the same answer for both) |
 | 405 | any non-GET/HEAD method (after authentication) |
+
+`GET /health` returns `ok` without touching the database. `GET /ready` runs one query as `api_data_owner` against `serving.all_signals` and returns 200 or 503; use it for probes.
 
 ## Known limits
 - Evidence grade is C everywhere (synthetic data, assumed parameters). Per-org S08 values differ from the global S08 by design: the peer baseline is computed inside each org (`serving.vendor_signals`).
 - Orgs are an assumption. The matrix proves the policies match the access table above; it does not prove the table itself is the right policy for a real business.
 - The catalog (`pg_class`) is readable by any role, so API roles can list table names. Tests assert they cannot select anything outside `serving`.
-- `api_login`, the group roles and the connection limit are not rate limiting. There is none in M5a.
+- There is no rate limiting in M5a. Bounds: pool of 5, `api_login` connection limit 20, `statement_timeout` 5 s, `limit` 500, `offset` 100000.
+- RLS reads `app.org_id` / `app.owner_id`, which any SQL run as an API role could `set_config`. This is safe only because the API issues fixed queries in a read-only transaction. Do not add an endpoint that runs caller-supplied SQL.
+- Risk R10 is assigned to `owner_accountant`, which is not an API role, so only data_owner sees it.
+- Action pins: workflow actions are pinned to tags, not commit SHAs (not done in M5a).
 - The test oracle runs as the table owner, which is not forced under RLS (FORCE would hide rows from dbt and the oracle).
 
 ## Run
@@ -63,7 +68,9 @@ JWT_SECRET=... API_DATABASE_URL=<api_login url> npm start --prefix api
 ```
 The leak harness derives the direct (non-pooled) host from the branch URL, refuses to run if its host equals `DATABASE_URL`'s, and skips cleanly when neither `NEON_TEST_DATABASE_URL` nor `NEON_CI_DATABASE_URL` is set. CI job `api-leaks` needs secrets `NEON_CI_DATABASE_URL` (a branch) and `API_LOGIN_PASSWORD`.
 
-## Test matrix (Neon branch run: 175 cases, 0 cross-org leaks)
+## Test matrix (Neon branch run: 182 cases, 0 cross-org leaks)
 Exact allowed row set per role and org for every endpoint (the access rules live in `api/test/access.js`, separate from the policy SQL); guessed ids (other org, sibling owner); SQL-looking inputs in filters, ids, limit and signed claims; missing, expired, forged, `alg: none`, wrong-algorithm and wrong-type tokens; `ground_truth` unreachable (schema and table privileges, live queries, nothing else selectable, nothing served mentions it); `api_login` cannot `SET ROLE` to the owner role, `neon_superuser`, `pg_read_all_data` and others, and cannot `SET SESSION AUTHORIZATION`; API roles are not superuser or BYPASSRLS and own no tables; non-GET methods are 405 and writes fail at the database.
+
+Also asserted: every schema except `serving` is closed to every API role (enumerated from `pg_namespace`), JWT issuer/audience/max-age, the offset cap and `/ready`.
 
 First run on the branch found one real leak, fixed before the pass above: S12 row-drift rows for `ground_truth.*` tables (names and row counts) were served to data_owner.

@@ -1,4 +1,7 @@
-{{ config(alias='work_orders') }}
+{{ config(
+    alias='work_orders',
+    indexes=[{'columns': ['work_order_id'], 'unique': True}, {'columns': ['org_id', 'work_order_id']}, {'columns': ['owner_id', 'work_order_id']}]
+) }}
 -- Work orders for maintenance, scoped by org. Explicit column list: tenant satisfaction is not served.
 select w.work_order_id, w.lease_id, w.unit_id, w.property_id, w.owner_id, m.org_id, w.zip,
        w.category, w.severity, w.notice_type, w.vendor_id,

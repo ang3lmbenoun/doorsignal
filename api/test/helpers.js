@@ -1,6 +1,7 @@
 import crypto from 'node:crypto';
 import pg from 'pg';
 import { SignJWT } from 'jose';
+import { AUDIENCE, ISSUER } from '../src/auth.js';
 
 try {
   process.loadEnvFile?.('../.env'); // repo-root .env (gitignored); cwd is api/ under `npm --prefix api`
@@ -43,16 +44,21 @@ export const adminUser = () => decodeURIComponent(new URL(ADMIN_URL).username);
 export const SECRET = crypto.randomBytes(32).toString('hex');
 const key = (secret) => new TextEncoder().encode(secret);
 
-export async function mint(claims, { secret = SECRET, alg = 'HS256', expiresIn = '5m' } = {}) {
-  let jwt = new SignJWT(claims).setProtectedHeader({ alg }).setIssuedAt();
-  jwt = typeof expiresIn === 'string' ? jwt.setExpirationTime(expiresIn) : jwt.setExpirationTime(expiresIn);
+export async function mint(
+  claims,
+  { secret = SECRET, alg = 'HS256', expiresIn = '5m', issuer = ISSUER, audience = AUDIENCE, issuedAt } = {},
+) {
+  const jwt = new SignJWT(claims).setProtectedHeader({ alg }).setIssuedAt(issuedAt).setExpirationTime(expiresIn);
+  if (issuer) jwt.setIssuer(issuer);
+  if (audience) jwt.setAudience(audience);
   return jwt.sign(key(secret));
 }
 
 // An unsigned token with alg "none".
 export function noneToken(claims) {
   const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
-  return `${b64({ alg: 'none', typ: 'JWT' })}.${b64({ ...claims, exp: Math.floor(Date.now() / 1000) + 300 })}.`;
+  const now = Math.floor(Date.now() / 1000);
+  return `${b64({ alg: 'none', typ: 'JWT' })}.${b64({ ...claims, iss: ISSUER, aud: AUDIENCE, iat: now, exp: now + 300 })}.`;
 }
 
 export function claimsFor(role, ctx) {

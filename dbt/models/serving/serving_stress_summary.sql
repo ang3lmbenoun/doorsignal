@@ -1,4 +1,7 @@
-{{ config(alias='stress_summary') }}
+{{ config(
+    alias='stress_summary',
+    indexes=[{'columns': ['owner_id', 'scenario_id'], 'unique': True}, {'columns': ['org_id']}]
+) }}
 -- Stress totals per scenario and per owner (with the owner's org). Portfolio-wide totals are not served:
 -- they would add up other orgs' leases. Callers see only their own rows; an org total is the sum of the
 -- rows they may already read. delta_vs_base is computed per owner against that owner's base scenario.

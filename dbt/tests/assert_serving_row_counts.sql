@@ -11,6 +11,10 @@ select 'leases' from (
     select (select count(*) from {{ ref('fct_leases') }}) a,
            (select count(*) from {{ ref('serving_leases') }}) b) t where a <> b
 union all
+select 'stress_summary' from (
+    select (select count(distinct owner_id) * count(distinct scenario_id) from {{ ref('stress_results') }}) a,
+           (select count(*) from {{ ref('serving_stress_summary') }}) b) t where a <> b
+union all
 select 'risk_register' from (
     select (select count(*) from {{ ref('risk_register') }}) a,
            (select count(*) from {{ ref('serving_risk_register') }}) b) t where a <> b

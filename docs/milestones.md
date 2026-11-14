@@ -12,5 +12,5 @@
 | M6 | Tableau dashboards, README, demo | Another person runs it from README |
 | M7 | Fair-housing audit harness, renewal ranker, narrators | Planted disparity detected; null scenario not flagged |
 
-Current: M5a built on branch `m5a-api-rls`. On Neon branch `m5a-rls-test`: dbt build `PASS=226 WARN=0 ERROR=0`; leak matrix 175 cases, 175 passed, 0 cross-org leaks (see docs/api.md). Waiting on Angel to review the PR. CI job `api-leaks` has not run yet: it needs secrets `NEON_CI_DATABASE_URL` and `API_LOGIN_PASSWORD`.
+Current: M5a built on branch `m5a-api-rls`. On Neon branch `m5a-rls-test`: full dbt build `PASS=226 WARN=0 ERROR=0`, serving rebuild after review fixes `PASS=54 WARN=0 ERROR=0`; leak matrix 182 cases, 182 passed, 0 cross-org leaks (see docs/api.md). Waiting on Angel to review the PR. CI job `api-leaks` has not run yet: it needs secrets `NEON_CI_DATABASE_URL` and `API_LOGIN_PASSWORD`.
 Done: M0 (CI green), M1 (load clean in Neon), M2 (dbt PASS=91 in Neon), M3 (CI green; Neon build not separately confirmed), M4 (merged, PR #1).

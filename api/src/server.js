@@ -10,4 +10,7 @@ try {
 
 const config = loadConfig();
 const app = createApp({ pool: createPool(config.databaseUrl), jwtSecret: config.jwtSecret });
-app.listen(config.port, () => console.log(`doorsignal api listening on ${config.port}`));
+const pool = app.locals.pool;
+const server = app.listen(config.port, () => console.log(`doorsignal api listening on ${config.port}`));
+// Drain in-flight requests on deploy instead of resetting them.
+process.on('SIGTERM', () => server.close(async () => { await pool.end(); process.exit(0); }));

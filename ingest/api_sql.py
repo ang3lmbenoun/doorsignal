@@ -21,6 +21,13 @@ SQL_DIR = ROOT / "ingest" / "sql"
 FILES = {"roles": "30_api_roles.sql", "rls": "31_serving_rls.sql"}
 
 
+def _host(url: str) -> str:
+    """Host without Neon's pooler suffix, so pooled and direct URLs compare equal."""
+    from urllib.parse import urlparse
+
+    return (urlparse(url).hostname or "").replace("-pooler", "")
+
+
 def target_url(url_env: str) -> str:
     from dotenv import load_dotenv
 
@@ -29,8 +36,8 @@ def target_url(url_env: str) -> str:
     if not url:
         raise ConfigError(f"{url_env} is not set (Neon branch URL, in .env or the environment).")
     main = os.environ.get("DATABASE_URL", "").strip()
-    if main and url == main:
-        raise ConfigError(f"{url_env} equals DATABASE_URL (main). Use a Neon branch URL.")
+    if main and _host(url) == _host(main):
+        raise ConfigError(f"{url_env} has the same host as DATABASE_URL (main). Use a branch.")
     return url
 
 

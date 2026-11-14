@@ -247,8 +247,15 @@ async function runMatrix() {
       'expired token': async () => mint({ role: 'data_owner' }, { expiresIn: Math.floor(Date.now() / 1000) - 60 }),
       'no exp claim': async () => {
         const { SignJWT } = await import('jose');
-        return new SignJWT({ role: 'data_owner' }).setProtectedHeader({ alg: 'HS256' }).sign(new TextEncoder().encode(SECRET));
+        return new SignJWT({ role: 'data_owner' })
+          .setProtectedHeader({ alg: 'HS256' }).setIssuer('doorsignal').setAudience('doorsignal-api').setIssuedAt()
+          .sign(new TextEncoder().encode(SECRET));
       },
+      'wrong issuer': async () => mint({ role: 'data_owner' }, { issuer: 'someone-else' }),
+      'wrong audience': async () => mint({ role: 'data_owner' }, { audience: 'other-service' }),
+      'no issuer or audience': async () => mint({ role: 'data_owner' }, { issuer: null, audience: null }),
+      'far-future exp but issued 2 hours ago (max age 1h)': async () =>
+        mint({ role: 'data_owner' }, { issuedAt: Math.floor(Date.now() / 1000) - 7200, expiresIn: '30d' }),
       'unknown role superuser': async () => mint({ role: 'superuser' }),
       'role postgres': async () => mint({ role: 'postgres' }),
       'role with SQL': async () => mint({ role: 'data_owner; DROP TABLE serving.leases' }),
@@ -264,6 +271,15 @@ async function runMatrix() {
         assert.ok(!(await res.text()).includes('"rows"'));
       });
     }
+    kase('offset above the cap is refused', async () => {
+      const token = await mint({ role: 'data_owner' });
+      assert.equal((await get('/v1/leases?offset=100001', token)).status, 400);
+    });
+    kase('/ready reads the serving layer as an API role and returns no data', async () => {
+      const res = await fetch(`${base}/ready`);
+      assert.equal(res.status, 200);
+      assert.deepEqual(await res.json(), { status: 'ready' });
+    });
     kase('Basic scheme is rejected', async () => {
       const res = await fetch(`${base}/v1/leases`, { headers: { authorization: 'Basic dXNlcjpwYXNz' } });
       assert.equal(res.status, 401);
@@ -302,6 +318,15 @@ async function runMatrix() {
         assert.equal(v.rows[0].s, false);
       });
     }
+    kase('every schema except serving is closed to every API role (enumerated from pg_namespace)', async () => {
+      const r = await admin.query(
+        `select n.nspname, r.rolname from pg_namespace n cross join pg_roles r
+         where r.rolname = any($1) and n.nspname <> 'serving' and n.nspname not like 'pg\\_toast%'
+           and n.nspname not in ('pg_catalog', 'information_schema')
+           and (has_schema_privilege(r.rolname, n.nspname, 'USAGE') or has_schema_privilege(r.rolname, n.nspname, 'CREATE'))`,
+        [roles]);
+      assert.deepEqual(r.rows, []);
+    });
     for (const role of ROLE_NAMES) {
       kase(`${role}: SELECT on ground_truth fails with permission denied (live query)`, async () => {
         const c = await apiClientFactory();

@@ -15,9 +15,14 @@ seeds:
       - {name: risk_id, tests: [unique, not_null]}
   - name: org_map
     description: "Assumed mapping of owner to management org, used for row-level security in the serving layer (basis: assumption, see sim/config.yaml)."
+    config:
+      column_types: {owner_id: text, org_id: text, org_name: text, source_tag: text}
     columns:
       - {name: owner_id, tests: [unique, not_null]}
       - {name: org_id, tests: [not_null]}
+      - name: source_tag
+        tests:
+          - accepted_values: {values: [REAL_PUBLIC, SYNTHETIC_CALIBRATED, USER_EXPORT]}
   - name: risk_scenarios
     description: "Stress scenario knobs: repair-time multiplier, extra vacancy days, PD multiplier."
     columns:

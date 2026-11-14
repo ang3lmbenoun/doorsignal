@@ -1,4 +1,7 @@
-{{ config(alias='leases') }}
+{{ config(
+    alias='leases',
+    indexes=[{'columns': ['lease_id'], 'unique': True}, {'columns': ['org_id', 'lease_id']}, {'columns': ['owner_id', 'lease_id']}]
+) }}
 -- Leases for leasing, scoped by org. Explicit column list. Not served: tenant id, ledger balances and
 -- payments (delinquency detail), turnover cost. No tenant attributes exist in fct_leases (rule 5).
 select l.lease_id, l.unit_id, l.property_id, l.owner_id, m.org_id, l.zip, l.bedrooms,

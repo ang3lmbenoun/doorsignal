@@ -32,7 +32,17 @@ def main() -> int:
     cmd = ["dbt", *sys.argv[1:], "--project-dir", "dbt", "--profiles-dir", "dbt"]
     code = subprocess.call(cmd, cwd=ROOT, env=env)
     if sys.argv[1:2] and sys.argv[1] in REAPPLY_AFTER:
-        reapply_rls(url)
+        if code != 0:
+            # A failed build can leave a serving table whose tests failed. Do not re-grant it:
+            # the API stays closed (403 logged, /ready 503) until a build passes or
+            # `api_sql rls` is run on purpose.
+            print("dbt failed: serving RLS not re-applied; tables stay closed", file=sys.stderr)
+            return code
+        try:
+            reapply_rls(url)
+        except Exception as e:  # noqa: BLE001 - report it and fail the run
+            print(f"ERROR: could not re-apply serving RLS: {type(e).__name__}", file=sys.stderr)
+            return 3
     return code
 
 

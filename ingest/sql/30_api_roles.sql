@@ -38,8 +38,9 @@ alter role api_login set default_transaction_read_only = on;
 alter role api_login set statement_timeout = '5s';
 alter role api_login set idle_in_transaction_session_timeout = '10s';
 
--- Nothing outside `serving` is reachable. These revokes are explicit so a future default grant cannot
--- reopen a schema. ground_truth is also closed to PUBLIC.
+-- Nothing outside `serving` is reachable. These revokes are explicit (including from PUBLIC) for the schemas this
+-- project knows about. A schema added later is covered by the leak test, which enumerates pg_namespace; it does
+-- not rely on this list. ground_truth is also closed to PUBLIC below.
 do $$
 declare s text;
 begin
@@ -47,6 +48,8 @@ begin
         if exists (select 1 from pg_namespace where nspname = s) then
             execute format('revoke all on all tables in schema %I from api_login, api_owner, api_property_manager, '
                            'api_maintenance_coordinator, api_leasing_manager, api_data_owner', s);
+            execute format('revoke all on schema %I from public', s);
+            execute format('revoke all on all tables in schema %I from public', s);
             execute format('revoke all on schema %I from api_login, api_owner, api_property_manager, '
                            'api_maintenance_coordinator, api_leasing_manager, api_data_owner', s);
         end if;

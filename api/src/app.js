@@ -4,6 +4,7 @@ import { withClaims } from './db.js';
 import { ENDPOINTS } from './endpoints.js';
 
 const MAX_LIMIT = 500;
+const MAX_OFFSET = 100000;
 
 function parsePaging(query) {
   const out = { limit: 100, offset: 0 };
@@ -13,7 +14,7 @@ function parsePaging(query) {
     if (typeof v !== 'string' || !/^\d{1,7}$/.test(v)) return null;
     out[key] = Number.parseInt(v, 10);
   }
-  if (out.limit < 1 || out.limit > MAX_LIMIT) return null;
+  if (out.limit < 1 || out.limit > MAX_LIMIT || out.offset > MAX_OFFSET) return null;
   return out;
 }
 
@@ -41,6 +42,7 @@ const reply = (res, status, error) => res.status(status).json({ error });
 
 function makeHandler(endpoint, pool, byId) {
   return async (req, res, next) => {
+    req.endpointTable = endpoint.table;
     try {
       const idValue = byId ? req.params.id : undefined;
       if (idValue !== undefined && !/^[A-Za-z0-9_.:-]{1,64}$/.test(idValue)) return reply(res, 400, 'bad request');
@@ -48,14 +50,17 @@ function makeHandler(endpoint, pool, byId) {
       const filters = buildFilters(endpoint, req.query, idValue);
       if (!paging || !filters) return reply(res, 400, 'bad request');
       const sql =
-        `SELECT * FROM serving.${endpoint.table}` +
+        `SELECT ${endpoint.columns.join(', ')} FROM serving.${endpoint.table}` +
         (filters.where.length ? ` WHERE ${filters.where.join(' AND ')}` : '') +
         ` ORDER BY ${endpoint.orderBy} LIMIT ${paging.limit} OFFSET ${paging.offset}`;
       const { rows } = await withClaims(pool, req.claims, (c) => c.query(sql, filters.values));
       // A row the caller may not see and a row that does not exist look the same: 404.
       if (idValue !== undefined && rows.length === 0) return reply(res, 404, 'not found');
       // Every response row must carry its evidence grade and lineage. Fail closed if one does not.
-      if (rows.some((r) => !r.evidence_grade || !r.lineage_ref)) return reply(res, 500, 'internal error');
+      if (rows.some((r) => !r.evidence_grade || !r.lineage_ref)) {
+        console.error('row without evidence_grade/lineage_ref', { table: endpoint.table });
+        return reply(res, 500, 'internal error');
+      }
       return res.json({ rows, meta: { count: rows.length, limit: paging.limit, offset: paging.offset } });
     } catch (err) {
       return next(err);
@@ -65,13 +70,26 @@ function makeHandler(endpoint, pool, byId) {
 
 export function createApp({ pool, jwtSecret }) {
   const app = express();
+  app.locals.pool = pool;
   app.disable('x-powered-by');
   app.use((req, res, next) => {
-    res.set('Cache-Control', 'no-store');
+    res.set({ 'Cache-Control': 'no-store', 'X-Content-Type-Options': 'nosniff' });
     next();
   });
 
   app.get('/health', (req, res) => res.json({ status: 'ok' }));
+  // Readiness: can the API role actually read the serving layer? Fails (503) after a dbt rebuild that did not
+  // re-apply grants, or when the database is unreachable. Returns no data.
+  app.get('/ready', async (req, res) => {
+    try {
+      await withClaims(pool, { role: 'data_owner', org_id: '', owner_id: '' }, (c) =>
+        c.query('SELECT 1 FROM serving.all_signals LIMIT 1'));
+      res.json({ status: 'ready' });
+    } catch (err) {
+      console.error('not ready', { code: err && err.code });
+      reply(res, 503, 'not ready');
+    }
+  });
 
   app.use('/v1', async (req, res, next) => {
     const claims = await authenticate(req.headers.authorization, jwtSecret);
@@ -94,7 +112,11 @@ export function createApp({ pool, jwtSecret }) {
   // Errors never echo database messages. A missing table privilege is a 403, everything else a 500.
   app.use((err, req, res, next) => {
     if (res.headersSent) return next(err);
-    if (err && err.code === '42501') return reply(res, 403, 'forbidden');
+    if (err && err.code === '42501') {
+      // Also what an un-reapplied dbt rebuild looks like (no grants): log it so it is not mistaken for authz.
+      console.error('permission denied', { role: req.claims && req.claims.role, table: req.endpointTable });
+      return reply(res, 403, 'forbidden');
+    }
     console.error('request failed', { path: req.path, code: err && err.code });
     return reply(res, 500, 'internal error');
   });

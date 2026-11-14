@@ -8,7 +8,7 @@ models:
       - {name: signal_id, tests: [not_null]}
       - {name: lineage_ref, tests: [not_null]}
       - name: evidence_grade
-        tests: [{accepted_values: {values: ['A', 'B', 'C']}}]
+        tests: [not_null, {accepted_values: {values: ['A', 'B', 'C']}}]
   - name: serving_vendor_signals
     columns:
       - {name: org_id, tests: [not_null]}
@@ -30,12 +30,17 @@ models:
   - name: serving_risk_register
     columns:
       - {name: risk_id, tests: [unique, not_null]}
+      - name: owner_role
+        tests:
+          - not_null
+          - accepted_values: {values: [owner, property_manager, maintenance_coordinator, leasing_manager, data_owner, owner_accountant]}  # owner_accountant is not an API role: visible to data_owner only
       - {name: lineage_ref, tests: [not_null]}
       - name: evidence_grade
         tests: [{accepted_values: {values: ['A', 'B', 'C']}}]
   - name: serving_work_orders
     columns:
       - {name: work_order_id, tests: [unique, not_null]}
+      - {name: owner_id, tests: [not_null]}
       - {name: org_id, tests: [not_null]}
       - {name: lineage_ref, tests: [not_null]}
       - name: evidence_grade
@@ -43,6 +48,7 @@ models:
   - name: serving_leases
     columns:
       - {name: lease_id, tests: [unique, not_null]}
+      - {name: owner_id, tests: [not_null]}
       - {name: org_id, tests: [not_null]}
       - {name: lineage_ref, tests: [not_null]}
       - name: evidence_grade

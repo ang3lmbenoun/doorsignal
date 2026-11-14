@@ -2,7 +2,15 @@ import pg from 'pg';
 import { ROLES } from './roles.js';
 
 export function createPool(databaseUrl) {
-  return new pg.Pool({ connectionString: databaseUrl, max: 5, connectionTimeoutMillis: 10000 });
+  const pool = new pg.Pool({
+    connectionString: databaseUrl,
+    max: 5,
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 30000,
+  });
+  // Neon suspends or drops idle connections; without a handler the pool's 'error' event would crash the process.
+  pool.on('error', (e) => console.error('pool error', { code: e && e.code }));
+  return pool;
 }
 
 // Every request runs in ONE read-only transaction: SET LOCAL ROLE + transaction-local claims, then the query.

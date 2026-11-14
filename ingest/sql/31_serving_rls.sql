@@ -56,22 +56,32 @@ declare
         ['leases', 'data_owner',       'true']
     ];
     i int;
+    pol record;
 begin
     -- Tables exposed to the API. serving.vendor_signals is an internal helper and is never granted.
+    -- Remove EVERY policy in serving, not only the ones named here: policies are permissive and OR together,
+    -- so one added by hand would silently widen access.
+    for pol in select policyname, tablename from pg_policies where schemaname = 'serving' loop
+        execute format('drop policy %I on serving.%I', pol.policyname, pol.tablename);
+    end loop;
+
     foreach t in array array['all_signals', 'expected_loss_by_lease', 'stress_summary', 'risk_register',
                              'work_orders', 'leases'] loop
+        if to_regclass(format('serving.%I', t)) is null then
+            raise notice 'serving.% does not exist; skipped (no grants, so it is closed)', t;
+            continue;
+        end if;
         execute format('alter table serving.%I enable row level security', t);
         execute format('revoke all on serving.%I from public, api_login, api_owner, api_property_manager, '
                        'api_maintenance_coordinator, api_leasing_manager, api_data_owner', t);
-        foreach r in array array['owner', 'property_manager', 'maintenance_coordinator', 'leasing_manager',
-                                 'data_owner'] loop
-            execute format('drop policy if exists %I on serving.%I', 'p_' || r, t);
-        end loop;
     end loop;
-    revoke all on serving.vendor_signals from public, api_login, api_owner, api_property_manager,
-        api_maintenance_coordinator, api_leasing_manager, api_data_owner;
+    if to_regclass('serving.vendor_signals') is not null then
+        revoke all on serving.vendor_signals from public, api_login, api_owner, api_property_manager,
+            api_maintenance_coordinator, api_leasing_manager, api_data_owner;
+    end if;
 
     for i in 1 .. array_length(rules, 1) loop
+        continue when to_regclass(format('serving.%I', rules[i][1])) is null;
         execute format('grant select on serving.%I to %I', rules[i][1], 'api_' || rules[i][2]);
         execute format('create policy %I on serving.%I for select to %I using (%s)',
                        'p_' || rules[i][2], rules[i][1], 'api_' || rules[i][2], rules[i][3]);

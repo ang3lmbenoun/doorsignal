@@ -1,6 +1,8 @@
 import { jwtVerify } from 'jose';
 import { REQUIRED_CLAIMS, ROLES } from './roles.js';
 
+export const ISSUER = 'doorsignal';
+export const AUDIENCE = 'doorsignal-api';
 const ID = /^[A-Za-z0-9_-]{1,32}$/;
 
 // Verifies a bearer token (HS256 only, exp required) and returns clean claims, or null.
@@ -12,7 +14,11 @@ export async function authenticate(header, secret) {
   try {
     ({ payload } = await jwtVerify(m[1], new TextEncoder().encode(secret), {
       algorithms: ['HS256'],
-      requiredClaims: ['exp'],
+      issuer: ISSUER,
+      audience: AUDIENCE,
+      requiredClaims: ['exp', 'iat'],
+      clockTolerance: 5,
+      maxTokenAge: '1h', // a token with a far-future exp is still refused once it is older than this
     }));
   } catch {
     return null;

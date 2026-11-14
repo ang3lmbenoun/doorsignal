@@ -1,4 +1,8 @@
-{{ config(alias='all_signals') }}
+{{ config(
+    alias='all_signals',
+    indexes=[{'columns': ['entity_id']}, {'columns': ['org_id', 'signal_id']}, {'columns': ['owner_id', 'signal_id']}],
+    post_hook="create unique index on {{ this }} (signal_id, entity_type, entity_id, org_id, owner_id) nulls not distinct"
+) }}
 -- Every signal with the org and owner it belongs to, for row-level security.
 --   lease / unit / work_order rows: owner resolved through the marts, org through org_map.
 --   vendor rows: replaced by the per-org S08 in vendor_signals (org set, owner null).
