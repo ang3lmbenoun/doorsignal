@@ -9,3 +9,11 @@ seeds:
           - accepted_values: {values: ['A', 'B', 'C']}
   - name: s04_coefficients
     description: "Renewal-risk model terms written by python -m signals.fit_s04."
+  - name: risk_register_input
+    description: "Risk register rows. Likelihood and impact are judgment inputs (1-5)."
+    columns:
+      - {name: risk_id, tests: [unique, not_null]}
+  - name: risk_scenarios
+    description: "Stress scenario knobs: repair-time multiplier, extra vacancy days, PD multiplier."
+    columns:
+      - {name: scenario_id, tests: [unique, not_null]}

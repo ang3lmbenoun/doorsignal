@@ -1,0 +1,6 @@
+scenario_id,description,delay_multiplier,extra_vacancy_days,pd_multiplier,basis
+base,No stress,1.00,0,1.00,definition
+vacancy_up_3pt,"Vacancy rate up 3 points: about 11 more vacant days per turnover (0.03 x 365)",1.00,11,1.00,"assumption: 3 points of annual vacancy = 0.03 x 365 days, applied per turnover"
+repair_time_up_25,"Repair and assignment times 25 percent slower",1.25,0,1.00,assumption
+delinquency_up_50,"Delinquency probability 50 percent higher",1.00,0,1.50,assumption
+combined,"All three stresses together",1.25,11,1.50,assumption

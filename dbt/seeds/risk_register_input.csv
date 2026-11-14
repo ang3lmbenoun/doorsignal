@@ -1,0 +1,11 @@
+risk_id,category,description,likelihood,impact,controls,owner_role,review_date,linked_signals,score_basis
+R01,Compliance,"Repair request not completed inside the Texas seven-day presumption window",3,4,"S01 clock with day-5 warning; T1 internal flag to maintenance coordinator; weekly review of open written-notice repairs",maintenance_coordinator,2027-01-15,S01;S02,judgment
+R02,Operations,"Slow vendor drags repair times across many units",3,3,"S08 vendor drift; reassign when drift flagged; quarterly vendor scorecard",maintenance_coordinator,2027-01-15,S08;S02,judgment
+R03,Revenue,"Non-renewal causes turnover cost and vacancy",4,4,"S04 renewal risk at 120/90/60 days; early outreach; offer sizing guardrails",leasing_manager,2027-01-15,S04;S03;S07,judgment
+R04,Revenue,"Extended vacancy on a unit after move-out",3,3,"S07 vacancy run-rate; make-ready checklist; pricing review at day 30",leasing_manager,2027-01-15,S07,judgment
+R05,Credit,"Tenant stops paying and balance is not recovered",3,4,"S05 payment timing shift; S06 aging; payment plan drafts for human approval (T2)",property_manager,2027-01-15,S05;S06,judgment
+R06,Market,"Local rent or affordability shock raises delinquency and lowers renewals",2,4,"Stress scenarios in risk.stress_summary; S10 market stress (not built yet)",property_manager,2027-01-15,S04;S06,judgment
+R07,Data,"Source data is stale, incomplete or drifting so signals mislead",3,4,"S12 staleness, null-rate and row-drift checks; dbt tests on every build",data_owner,2027-01-15,S12,judgment
+R08,Model,"Renewal model mis-calibrated or trained on synthetic effects",3,3,"Out-of-time backtest and calibration table (M4); evidence grade C badge on S04",data_owner,2027-01-15,S04,judgment
+R09,Fair housing,"A signal or agent action disadvantages a protected group",2,5,"No protected attributes as features; no applicant scoring; S13 audit harness (M7)",property_manager,2027-01-15,S12,judgment
+R10,Owner trust,"Owner statement does not reconcile to the ledger",2,3,"Ledger reconciliation test on every build; S11 anomaly (not built yet)",owner_accountant,2027-01-15,S12,judgment

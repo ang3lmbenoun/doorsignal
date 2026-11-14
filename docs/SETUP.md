@@ -18,3 +18,11 @@ python -m ingest.load_hud          # real HUD SAFMR rents for Texas ZIPs -> raw.
 python -m ingest.run_dbt build     # staging -> intermediate -> marts, plus all tests
 ```
 Expect `Done. PASS=91 WARN=0 ERROR=0`. Needs `data/reference/fy2026_safmrs_revised.xlsx`.
+
+## M4: risk layer
+```
+python -m ingest.run_dbt build      # expect Done. PASS=180 (risk schema included)
+python -m risk.backtest             # writes docs/risk/backtest.md and calibration_table.csv
+python -m risk.scenarios            # writes docs/risk/scenario_run.md
+```
+The committed files in `docs/risk/` were generated on a local database with placeholder rents (the HUD file is not in the repo). Run the two commands against Neon and commit the regenerated files.
