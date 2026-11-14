@@ -68,6 +68,27 @@ JWT_SECRET=... API_DATABASE_URL=<api_login url> npm start --prefix api
 ```
 The leak harness derives the direct (non-pooled) host from the branch URL, refuses to run if its host equals `DATABASE_URL`'s, and skips cleanly when neither `NEON_TEST_DATABASE_URL` nor `NEON_CI_DATABASE_URL` is set. CI job `api-leaks` needs secrets `NEON_CI_DATABASE_URL` (a branch) and `API_LOGIN_PASSWORD`.
 
+## Policy-mutation check (does the matrix notice a weakened policy?)
+Run on the Neon branch `m5a-rls-test` only (host checked against main first). Each mutation was applied, the 182-case matrix run, then `30_api_roles.sql` and `31_serving_rls.sql` re-applied and the restored state verified (policy count and text, no `ground_truth` usage, no inherited membership). 31 alone does not undo mutations 5 and 6, which change a schema grant and a role membership, so 30 was re-run as well.
+
+| # | Mutation | Cases failed | Caught | Failing cases |
+|---|---|---|---|---|
+| 1 | `all_signals`, property_manager: `org_id = org` replaced by `true` | 5 (834 leaked rows counted) | yes | property_manager/ORG1 and ORG2 `GET /v1/signals`, both foreign-id cases, summary |
+| 2 | `all_signals`, owner: owner_id condition dropped (org only) | 4 (632 leaked rows) | yes | owner/ORG1 and ORG2 `GET /v1/signals`, owner/ORG2 foreign id, summary |
+| 3 | `leases`, leasing_manager: policy removed, `select` granted anyway | 2 (0 leaked rows) | yes | leasing_manager/ORG1 and ORG2 `GET /v1/leases` |
+| 4 | `all_signals`, maintenance_coordinator: all signal_ids allowed | 4 (484 leaked rows) | yes | maintenance_coordinator/ORG1 and ORG2 `GET /v1/signals`, ORG2 foreign id, summary |
+| 5 | `grant usage on schema ground_truth to api_data_owner` | 2 | yes | api_data_owner schema/table privilege case, "every schema except serving is closed" |
+| 6 | `grant api_data_owner to api_login with inherit true, set true` | 1 | yes | "api_login does not inherit the group roles" |
+
+Final run after the last restore: 182 cases, 182 passed, 0 cross-org leaks.
+
+What the table shows, and does not:
+- Every mutation failed at least one case, so none of these six weakenings goes unnoticed. Six mutations are a sample, not a proof that every possible weakening is caught.
+- Mutation 3 leaks no rows: with RLS on and no policy, Postgres denies everything, and the test fails because the visible set differs from the expected one. A missing policy is therefore caught as an outage, not as a leak.
+- Mutation 5 grants schema usage but no table privilege, so the live `SELECT` against `ground_truth` still failed with permission denied. Only the privilege checks caught it. That is correct (usage alone exposes no rows), but it shows the privilege checks, not the live queries, are what guard this case.
+- Mutation 6 is caught by exactly one case. If that case were removed, the matrix would stay green while `api_login` could read everything `api_data_owner` can, because the API itself always does `SET LOCAL ROLE`.
+- Mutations 1, 2 and 4 are caught by several cases each, so they have more than one line of defence.
+
 ## Test matrix (Neon branch run: 182 cases, 0 cross-org leaks)
 Exact allowed row set per role and org for every endpoint (the access rules live in `api/test/access.js`, separate from the policy SQL); guessed ids (other org, sibling owner); SQL-looking inputs in filters, ids, limit and signed claims; missing, expired, forged, `alg: none`, wrong-algorithm and wrong-type tokens; `ground_truth` unreachable (schema and table privileges, live queries, nothing else selectable, nothing served mentions it); `api_login` cannot `SET ROLE` to the owner role, `neon_superuser`, `pg_read_all_data` and others, and cannot `SET SESSION AUTHORIZATION`; API roles are not superuser or BYPASSRLS and own no tables; non-GET methods are 405 and writes fail at the database.
 
