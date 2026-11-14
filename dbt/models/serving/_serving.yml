@@ -1,0 +1,49 @@
+version: 2
+# Serving layer for the API. Row-level security is applied by ingest/sql/31_serving_rls.sql after each build.
+# serving.vendor_signals is an internal helper: it is never granted to an API role.
+models:
+  - name: serving_all_signals
+    columns:
+      - {name: entity_id, tests: [not_null]}
+      - {name: signal_id, tests: [not_null]}
+      - {name: lineage_ref, tests: [not_null]}
+      - name: evidence_grade
+        tests: [{accepted_values: {values: ['A', 'B', 'C']}}]
+  - name: serving_vendor_signals
+    columns:
+      - {name: org_id, tests: [not_null]}
+  - name: serving_expected_loss_by_lease
+    columns:
+      - {name: lease_id, tests: [unique, not_null]}
+      - {name: org_id, tests: [not_null]}
+      - {name: owner_id, tests: [not_null]}
+      - {name: lineage_ref, tests: [not_null]}
+      - name: evidence_grade
+        tests: [{accepted_values: {values: ['A', 'B', 'C']}}]
+  - name: serving_stress_summary
+    columns:
+      - {name: org_id, tests: [not_null]}
+      - {name: owner_id, tests: [not_null]}
+      - {name: lineage_ref, tests: [not_null]}
+      - name: evidence_grade
+        tests: [{accepted_values: {values: ['A', 'B', 'C']}}]
+  - name: serving_risk_register
+    columns:
+      - {name: risk_id, tests: [unique, not_null]}
+      - {name: lineage_ref, tests: [not_null]}
+      - name: evidence_grade
+        tests: [{accepted_values: {values: ['A', 'B', 'C']}}]
+  - name: serving_work_orders
+    columns:
+      - {name: work_order_id, tests: [unique, not_null]}
+      - {name: org_id, tests: [not_null]}
+      - {name: lineage_ref, tests: [not_null]}
+      - name: evidence_grade
+        tests: [{accepted_values: {values: ['A', 'B', 'C']}}]
+  - name: serving_leases
+    columns:
+      - {name: lease_id, tests: [unique, not_null]}
+      - {name: org_id, tests: [not_null]}
+      - {name: lineage_ref, tests: [not_null]}
+      - name: evidence_grade
+        tests: [{accepted_values: {values: ['A', 'B', 'C']}}]

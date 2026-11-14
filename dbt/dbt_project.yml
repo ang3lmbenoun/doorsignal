@@ -25,6 +25,9 @@ models:
     risk:
       +schema: risk
       +materialized: table
+    serving:
+      +schema: serving
+      +materialized: table
 
 seeds:
   doorsignal:
