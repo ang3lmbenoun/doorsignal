@@ -13,6 +13,8 @@ portfolio:
   n_owners: {value: 6, basis: assumption}
   n_properties: {value: 25, basis: assumption}
   n_vendors: {value: 12, basis: assumption}
+  # Used by the API serving layer (dbt seed org_map), not by the simulator. Owners O01-O03 -> ORG1, O04-O06 -> ORG2.
+  n_orgs: {value: 2, basis: assumption}
   owner_spend_limits: {value: [250, 500, 750], basis: assumption}
   mgmt_fee_pct_options: {value: [0.08, 0.09, 0.10], basis: "benchmark: 8-12% of rent is the commonly quoted fee range (BiggerPockets)"}
   year_built_range: {value: [1965, 2020], basis: assumption}

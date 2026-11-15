@@ -25,6 +25,9 @@ models:
     risk:
       +schema: risk
       +materialized: table
+    serving:
+      +schema: serving
+      +materialized: table
 
 seeds:
   doorsignal:
@@ -33,6 +36,8 @@ seeds:
       +schema: risk
     risk_scenarios:
       +schema: risk
+    org_map:
+      +schema: ops
 
 vars:
   as_of_date: "2026-10-31"
