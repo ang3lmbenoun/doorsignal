@@ -124,6 +124,20 @@ async function run() {
       assert.equal(r.rows[0].draft_sha256, null);
     });
 
+    test('a second approval for the same action fails (unique on approvals.action_id), for the writer and the owner', async () => {
+      const s = await seed(ORG1);
+      const again = (c) => c.query("insert into ops.approvals (approval_id, action_id, org_id, status) values ($1,$2,$3,'pending')", [uuid(), s.t2, ORG1]);
+      await fails(asWriter(ORG1, again), ['23505']);
+      await fails(inTx(adminClientConfig().connectionString, async () => {}, again), ['23505']);
+      const n = await admin.query('select count(*)::int as n from ops.approvals where action_id = $1', [s.t2]);
+      assert.equal(n.rows[0].n, 1);
+      const u = await admin.query(
+        `select count(*)::int as n from pg_constraint
+         where conrelid = 'ops.approvals'::regclass and contype = 'u'
+           and conkey = array[(select attnum from pg_attribute where attrelid = 'ops.approvals'::regclass and attname = 'action_id')]`);
+      assert.equal(u.rows[0].n, 1, 'unique constraint on approvals(action_id) is missing');
+    });
+
     for (const [name, sql] of [
       ['UPDATE approvals (self-approve)', "update ops.approvals set status = 'approved'"],
       ['DELETE approvals', 'delete from ops.approvals'],

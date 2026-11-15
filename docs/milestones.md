@@ -9,6 +9,7 @@
 | M4 | Risk layer: register, expected loss, stress scenarios, backtest | Calibration table produced; scenario run reproducible |
 | M5a | Read-only API with RLS (5 roles as Postgres roles, serving layer, leak matrix) | `npm run test:leaks --prefix api`: 0 cross-org leaks across at least 40 cases |
 | M5b | Approval inbox, maintenance triage agent, model-selection eval | S01 breach flag at day 7.0 and not at 6.9, end to end through the agent path; agent cannot send or write ledger/lease data (tests); nothing counts as approved without a human |
+| M5c | Inbox hardening (moved out of M5b): duplicate-run protection, retention rule, `finished_at NOT NULL`, draft-hash and payload/error_code caps (planned migration `ingest/sql/34_ops_hardening_PLANNED.sql`), GitHub Actions pinned to commit SHAs | migration 34 applied on a branch and the full DB suite passes with one test per constraint; duplicate runs create no second pending draft; Actions pinned (not started) |
 | M6 | Tableau dashboards, README, demo | Another person runs it from README |
 | M7 | Fair-housing audit harness, renewal ranker, narrators | Planted disparity detected; null scenario not flagged |
 
