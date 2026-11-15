@@ -4,7 +4,7 @@ import { LlmUnavailable } from '../../agent/llm.js';
 import { messagesFor } from '../../agent/prompt.js';
 import { triageRules } from '../../agent/rules.js';
 import { DISCLAIMER } from '../../agent/schema.js';
-import { buildActions, triageCases } from '../../agent/triage.js';
+import { buildActions, runTriage, summarizeAttempts, triageCases } from '../../agent/triage.js';
 import { json, mk, s01 } from './fixtures.js';
 
 const kinds = (r) => r.flags.map((f) => `${f.work_order_id}:${f.kind}`).sort();
@@ -76,7 +76,7 @@ describe('triage with a model', () => {
       assert.ok(r.flags.every((f) => f.source === 'rules') && r.drafts.every((d) => d.source === 'rules'));
       assert.match(r.errorCode, /#[0-9a-f]{8}/); // reason code + short hash, never the content
       assert.ok(!JSON.stringify(r).includes('http://x.example') && !r.errorCode.includes('send_email'));
-      assert.equal(logged.length, 1);
+      assert.equal(logged.filter(([m]) => m === 'agent output rejected').length, 1);
       assert.ok(!JSON.stringify(logged).includes(text));
     });
   }
@@ -168,5 +168,73 @@ describe('actions written to the inbox', () => {
         assert.match(a.draftText, /rebuttable presumption, not a legal finding/);
       }
     }
+  });
+});
+
+describe('run records: why a run fell back, how many batches were rejected, and crashes', () => {
+  const cases = [mk('W000001', { s01: s01(7.0) })];
+  test('a provider failure keeps provider and status per attempt in the error code (retired model vs outage)', async () => {
+    const down = async () => { throw new LlmUnavailable([{ provider: 'nvidia', attempt: 1, status: 410 }, { provider: 'nvidia', attempt: 1, status: 410 }, { provider: 'google', attempt: 1, error: 'timeout' }]); };
+    const r = await triageCases({ cases, providers, completeFn: down, log: quiet });
+    assert.equal(r.status, 'fallback');
+    assert.match(r.errorCode, /^unavailable:nvidia:410,google:timeout;batches=1;llm=0;rejected=0;rules=1$/);
+    assert.equal(summarizeAttempts([{ provider: 'a', status: 500 }, { provider: 'a', status: 500 }]), 'a:500');
+  });
+  test('no provider configured is labelled, not confused with "all providers failed"', async () => {
+    const r = await triageCases({ cases, providers: [], log: quiet });
+    assert.equal(r.status, 'fallback');
+    assert.match(r.errorCode, /^no_provider;/);
+  });
+  test('batch counts show a systematically bad model (9 of 10 batches rejected is not an "ok" llm run)', async () => {
+    const many = Array.from({ length: 100 }, (_, i) => mk(`W${String(i + 1).padStart(6, '0')}`, { s01: s01(8) }));
+    let call = 0;
+    const completeFn = async ({ messages }) => {
+      call += 1;
+      if (call === 1) { // the first batch is answered correctly
+        const body = messages[1].content;
+        const batch = JSON.parse(body.slice('<cases>'.length + 1, body.length - '</cases>'.length - 1));
+        return { text: json(batch.map((c) => ({ work_order_id: c.work_order_id, kind: 'repair_breach_presumed', reason: 'Seven days reached.' }))), provider: 'fake', model: 'm' };
+      }
+      return { text: 'not json', provider: 'fake', model: 'm' };
+    };
+    const r = await triageCases({ cases: many, providers, completeFn, log: quiet });
+    assert.deepEqual([r.mode, r.status], ['llm', 'rejected_output']);
+    assert.deepEqual(r.counts, { batches: 10, rejected: 9, rules: 9, llm: 1 });
+    assert.match(r.errorCode, /batches=10;llm=1;rejected=9;rules=9$/);
+    assert.ok(r.flags.length === 100); // nothing lost: the rejected batches came from the rules
+  });
+  test('a run deadline hands the remaining batches to the rules instead of waiting on a slow provider', async () => {
+    const many = Array.from({ length: 30 }, (_, i) => mk(`W${String(i + 1).padStart(6, '0')}`, { s01: s01(8) }));
+    let t = 0;
+    let calls = 0;
+    const completeFn = async () => { calls += 1; t += 400000; return { text: json(), provider: 'fake', model: 'm' }; };
+    const r = await triageCases({ cases: many, providers, completeFn, now: () => t, deadlineMs: 500000, log: quiet });
+    assert.equal(calls, 2); // third batch is past the deadline
+    assert.equal(r.status, 'fallback');
+    assert.match(r.errorCode, /^deadline;/);
+    assert.equal(r.counts.rules, 1);
+  });
+  test('a crash leaves an error run row (reason only), then the error is rethrown', async () => {
+    const written = [];
+    const writer = { write: async (x) => { written.push(x); return { runId: 'r' }; } };
+    const client = { getAll: async () => { throw new Error('API GET /v1/signals failed with status 403'); }, get: async () => ({ rows: [] }) };
+    await assert.rejects(runTriage({ org: 'ORG1', client, writer, providers: [], rulesOnly: true, log: quiet }), /status 403/);
+    assert.equal(written.length, 1);
+    assert.equal(written[0].run.status, 'error');
+    assert.match(written[0].run.errorCode, /^error:Error:API GET \/v1\/signals failed with status 403$/);
+    assert.deepEqual(written[0].actions, []);
+  });
+  test('if even the error row cannot be written, the original error still surfaces', async () => {
+    const writer = { write: async () => { throw new Error('password authentication failed'); } };
+    const client = { getAll: async () => { throw new Error('boom'); }, get: async () => ({ rows: [] }) };
+    await assert.rejects(runTriage({ org: 'ORG1', client, writer, providers: [], rulesOnly: true, log: quiet }), /boom/);
+  });
+  test('zero cases is logged, not silent', async () => {
+    const logs = [];
+    const writer = { write: async () => ({ runId: 'r' }) };
+    const client = { getAll: async () => [], get: async () => ({ rows: [] }) };
+    const s = await runTriage({ org: 'ORG1', client, writer, providers: [], rulesOnly: true, log: (m) => logs.push(m) });
+    assert.equal(s.cases, 0);
+    assert.ok(logs.includes('triage found no cases to look at'));
   });
 });

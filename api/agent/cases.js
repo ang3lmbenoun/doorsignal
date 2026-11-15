@@ -31,7 +31,9 @@ async function mapLimit(items, limit, fn) {
   return out;
 }
 
-export async function loadCases(client, { maxCases = MAX_CASES } = {}) {
+// onStats({candidates, kept, truncated}) lets the caller log how many flagged work orders there were and
+// whether the cap dropped any, so "no cases" and "cut short" are visible instead of silent.
+export async function loadCases(client, { maxCases = MAX_CASES, onStats } = {}) {
   const byId = new Map();
   for (const { key, signal, bands } of SOURCES) {
     for (const band of bands) {
@@ -44,8 +46,8 @@ export async function loadCases(client, { maxCases = MAX_CASES } = {}) {
       }
     }
   }
-  const candidates = [...byId.values()].sort((a, b) => priority(b) - priority(a) || a.work_order_id.localeCompare(b.work_order_id))
-    .slice(0, maxCases);
+  const ranked = [...byId.values()].sort((a, b) => priority(b) - priority(a) || a.work_order_id.localeCompare(b.work_order_id));
+  const candidates = ranked.slice(0, maxCases);
   const details = await mapLimit(candidates, 5, async (c) => {
     const body = await client.get(`/v1/work-orders/${encodeURIComponent(c.work_order_id)}`);
     return body.rows[0];
@@ -66,5 +68,6 @@ export async function loadCases(client, { maxCases = MAX_CASES } = {}) {
       s09: c.s09,
     });
   });
+  if (onStats) onStats({ candidates: ranked.length, kept: cases.length, truncated: ranked.length > maxCases });
   return cases;
 }

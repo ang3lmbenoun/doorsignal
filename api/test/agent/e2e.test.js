@@ -160,7 +160,7 @@ async function run() {
       assert.deepEqual(await breachIds(r.runId), [idOf(7.0), idOf(7.001)].sort()); // from the rules, not the model
       const run = (await runRows(r.runId))[0];
       assert.equal(run.status, 'rejected_output');
-      assert.match(run.error_code, /^contradicts_inputs:flag:repair_breach_presumed#[0-9a-f]{8}$/);
+      assert.match(run.error_code, /^contradicts_inputs:flag:repair_breach_presumed#[0-9a-f]{8};batches=1;llm=0;rejected=1;rules=1$/);
       assert.ok(!JSON.stringify(await actions(r.runId)).includes('Ignore the rules'));
     });
 
