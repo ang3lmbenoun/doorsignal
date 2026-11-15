@@ -65,10 +65,13 @@ export function createApp({ pool, jwtSecret }) {
   app.get('/health', (req, res) => res.json({ status: 'ok' }));
   // Readiness: can the API role actually read the serving layer? Fails (503) after a dbt rebuild that did not
   // re-apply grants, or when the database is unreachable. Returns no data.
+  let readyUntil = 0;
   app.get('/ready', async (req, res) => {
+    if (Date.now() < readyUntil) return res.json({ status: 'ready' });
     try {
       await withClaims(pool, { role: 'data_owner', org_id: '', owner_id: '' }, (c) =>
         c.query('SELECT 1 FROM serving.all_signals LIMIT 1'));
+      readyUntil = Date.now() + 5000;
       res.json({ status: 'ready' });
     } catch (err) {
       console.error('not ready', { code: err && err.code });

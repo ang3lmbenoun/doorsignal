@@ -5,6 +5,8 @@
 //   LLM_PROVIDER_ORDER   comma list, default "nvidia,google,openrouter"
 //   LLM_MODEL_NVIDIA / LLM_MODEL_GOOGLE / LLM_MODEL_OPENROUTER   model id per provider (no built-in defaults)
 //   NVIDIA_API_KEY / GOOGLE_API_KEY / OPENROUTER_API_KEY
+//   LLM_DATA_CLASS      must be exactly "synthetic": the operator's statement that every record sent to a provider
+//                       is synthetic. Without it no provider is used (the run falls back to the rules).
 // A provider without both a key and a model is skipped. With none configured, complete() throws
 // LlmUnavailable and the caller falls back to the rule-based triage.
 //
@@ -26,7 +28,10 @@ export class LlmUnavailable extends Error {
   }
 }
 
+export const MAX_BODY = 262144; // bytes of provider response read before giving up
+
 export function loadProviders(env = process.env) {
+  if (env.LLM_DATA_CLASS !== 'synthetic') return [];
   const order = (env.LLM_PROVIDER_ORDER || 'nvidia,google,openrouter').split(',').map((s) => s.trim().toLowerCase());
   const out = [];
   for (const name of order) {
@@ -41,6 +46,7 @@ export function loadProviders(env = process.env) {
 
 // One provider with an explicit model, for the eval (so provider URLs stay in this file). Null if no key is set.
 export function providerFor(name, model, env = process.env) {
+  if (env.LLM_DATA_CLASS !== 'synthetic') return null;
   const p = KNOWN[name];
   const key = p ? (env[p.keyEnv] || '').trim() : '';
   return p && key && model ? { name, baseUrl: p.baseUrl, key, model } : null;
@@ -95,7 +101,11 @@ export async function complete({
       if (res.ok) {
         let data;
         try {
-          data = await res.json();
+          const declared = Number(res.headers && res.headers.get && res.headers.get('content-length'));
+          if (Number.isFinite(declared) && declared > MAX_BODY) throw new Error('too large');
+          const bodyText = typeof res.text === 'function' ? await res.text() : JSON.stringify(await res.json());
+          if (bodyText.length > MAX_BODY) throw new Error('too large');
+          data = JSON.parse(bodyText);
         } catch {
           attempts.push({ provider: p.name, attempt, error: 'bad_json_envelope' });
           break; // a malformed envelope is not retried: try the next provider

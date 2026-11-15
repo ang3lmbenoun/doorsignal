@@ -26,9 +26,12 @@ PASSWORD_ENV = {"api_login": "API_LOGIN_PASSWORD", "api_agent_writer": "AGENT_WR
 
 def _host(url: str) -> str:
     """Host without Neon's pooler suffix, so pooled and direct URLs compare equal."""
-    from urllib.parse import urlparse
+    from urllib.parse import parse_qs, urlparse
 
-    return (urlparse(url).hostname or "").replace("-pooler", "")
+    parsed = urlparse(url)
+    if {"host", "hostaddr"} & set(parse_qs(parsed.query)):
+        raise ConfigError("URLs with a host or hostaddr query parameter are refused.")
+    return (parsed.hostname or "").replace("-pooler", "")
 
 
 def target_url(url_env: str) -> str:
@@ -38,9 +41,17 @@ def target_url(url_env: str) -> str:
     url = os.environ.get(url_env, "").strip()
     if not url:
         raise ConfigError(f"{url_env} is not set (Neon branch URL, in .env or the environment).")
+    # The main host comes from MAIN_DATABASE_HOST (a host name, not a secret) or from DATABASE_URL.
+    # In CI an unknown main host is an error: the guard must not pass just because nothing was
+    # configured to compare with.
+    main_host = os.environ.get("MAIN_DATABASE_HOST", "").strip().replace("-pooler", "")
     main = os.environ.get("DATABASE_URL", "").strip()
-    if main and _host(url) == _host(main):
-        raise ConfigError(f"{url_env} has the same host as DATABASE_URL (main). Use a branch.")
+    if not main_host and main:
+        main_host = _host(main)
+    if not main_host and os.environ.get("GITHUB_ACTIONS") == "true":
+        raise ConfigError("The main database host is unknown (set MAIN_DATABASE_HOST).")
+    if main_host and _host(url) == main_host:
+        raise ConfigError(f"{url_env} has the same host as the main database. Use a branch.")
     return url
 
 

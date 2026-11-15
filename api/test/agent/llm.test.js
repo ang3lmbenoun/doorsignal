@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { complete, LlmUnavailable, loadProviders } from '../../agent/llm.js';
+import { complete, LlmUnavailable, loadProviders, MAX_BODY, providerFor } from '../../agent/llm.js';
 import { okResponse, statusResponse } from './fixtures.js';
 
 const P = (name, key = `key-${name}`) => ({ name, baseUrl: `http://${name}.test/v1`, key, model: `model-${name}` });
@@ -91,17 +91,33 @@ describe('retry and fallback', () => {
 describe('configuration from the environment', () => {
   test('order, models and keys come from env; a provider without key or model is skipped', () => {
     const p = loadProviders({
-      LLM_PROVIDER_ORDER: 'openrouter, nvidia ,google',
+      LLM_DATA_CLASS: 'synthetic', LLM_PROVIDER_ORDER: 'openrouter, nvidia ,google',
       NVIDIA_API_KEY: 'n', LLM_MODEL_NVIDIA: 'nm', OPENROUTER_API_KEY: 'o', LLM_MODEL_OPENROUTER: 'om', GOOGLE_API_KEY: 'g',
     });
     assert.deepEqual(p.map((x) => [x.name, x.model]), [['openrouter', 'om'], ['nvidia', 'nm']]); // google has no model
     assert.equal(p[1].baseUrl, 'https://integrate.api.nvidia.com/v1');
   });
   test('default order, unknown names ignored, duplicates dropped, nothing configured gives none', () => {
-    const env = { NVIDIA_API_KEY: 'n', LLM_MODEL_NVIDIA: 'm', GOOGLE_API_KEY: 'g', LLM_MODEL_GOOGLE: 'gm' };
+    const env = { LLM_DATA_CLASS: 'synthetic', NVIDIA_API_KEY: 'n', LLM_MODEL_NVIDIA: 'm', GOOGLE_API_KEY: 'g', LLM_MODEL_GOOGLE: 'gm' };
     assert.deepEqual(loadProviders(env).map((x) => x.name), ['nvidia', 'google']);
     assert.deepEqual(loadProviders({ ...env, LLM_PROVIDER_ORDER: 'evil,nvidia,nvidia' }).map((x) => x.name), ['nvidia']);
     assert.deepEqual(loadProviders({}), []);
+  });
+  test('without LLM_DATA_CLASS=synthetic no provider is used at all (only synthetic data may be sent)', () => {
+    const env = { NVIDIA_API_KEY: 'n', LLM_MODEL_NVIDIA: 'm' };
+    assert.deepEqual(loadProviders(env), []);
+    assert.equal(providerFor('nvidia', 'm', env), null);
+    assert.deepEqual(loadProviders({ ...env, LLM_DATA_CLASS: 'real' }), []);
+    assert.equal(providerFor('nvidia', 'm', { ...env, LLM_DATA_CLASS: 'synthetic' }).name, 'nvidia');
+  });
+  test('a response declared or found larger than the cap is not parsed; the next provider is tried', async () => {
+    const huge = { ok: true, status: 200, headers: new Headers({ 'content-length': String(MAX_BODY + 1) }), json: async () => ({}) };
+    const bigBody = { ok: true, status: 200, headers: new Headers(), text: async () => 'x'.repeat(MAX_BODY + 1) };
+    for (const first of [huge, bigBody]) {
+      const { transport } = script([first, okResponse('from b')]);
+      const r = await complete({ providers: [P('a'), P('b')], messages: msgs, transport, sleep: sleeps().sleep });
+      assert.equal(r.provider, 'b');
+    }
   });
   test('the real network is never used by these tests (fetch is disabled)', async () => {
     const { transport } = script([okResponse('x')]);

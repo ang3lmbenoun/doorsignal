@@ -2,6 +2,15 @@
 // agent's token (org-scoped maintenance_coordinator): the agent cannot see another org's work orders.
 export const MAX_CASES = 60;
 
+// Fields from the API end up inside draft text, so they must have the simulator's exact shapes. A row whose
+// fields do not match is skipped (and counted) instead of being interpolated into a tenant-facing draft.
+const SHAPES = { work_order_id: /^W\d{6}$/, unit_id: /^U\d{4}$/ };
+const VENDOR = /^V\d{2}$/;
+const CATEGORIES = new Set(['hvac', 'pest', 'other', 'appliance', 'flooring_paint', 'plumbing', 'electrical']);
+const SEVERITIES = new Set(['urgent', 'routine', 'emergency']);
+export const safeShape = (c) => SHAPES.work_order_id.test(c.work_order_id) && SHAPES.unit_id.test(c.unit_id)
+  && (c.vendor_id === null || VENDOR.test(c.vendor_id)) && CATEGORIES.has(c.category) && SEVERITIES.has(c.severity);
+
 const SOURCES = [
   { key: 's01', signal: 'S01', bands: ['breach_presumed', 'at_risk', 'emergency_watch'] },
   { key: 's02', signal: 'S02', bands: ['high', 'elevated'] },
@@ -48,16 +57,18 @@ export async function loadCases(client, { maxCases = MAX_CASES, onStats } = {}) 
   }
   const ranked = [...byId.values()].sort((a, b) => priority(b) - priority(a) || a.work_order_id.localeCompare(b.work_order_id));
   const candidates = ranked.slice(0, maxCases);
-  const details = await mapLimit(candidates, 5, async (c) => {
+  // Two requests at a time: the API pool is small and human approvers share it.
+  const details = await mapLimit(candidates, 2, async (c) => {
     const body = await client.get(`/v1/work-orders/${encodeURIComponent(c.work_order_id)}`);
     return body.rows[0];
   });
   const cases = [];
+  let unsafe = 0;
   candidates.forEach((c, i) => {
     const w = details[i];
     // Actionable only while the request is open (S01 rows are open by construction).
     if (!w || !(c.s01 || w.is_open)) return;
-    cases.push({
+    const built = {
       work_order_id: c.work_order_id,
       unit_id: w.unit_id,
       vendor_id: w.vendor_id ?? null,
@@ -66,8 +77,10 @@ export async function loadCases(client, { maxCases = MAX_CASES, onStats } = {}) 
       s01: c.s01,
       s02: c.s02,
       s09: c.s09,
-    });
+    };
+    if (safeShape(built)) cases.push(built);
+    else unsafe += 1;
   });
-  if (onStats) onStats({ candidates: ranked.length, kept: cases.length, truncated: ranked.length > maxCases });
+  if (onStats) onStats({ candidates: ranked.length, kept: cases.length, truncated: ranked.length > maxCases, skippedUnsafe: unsafe });
   return cases;
 }

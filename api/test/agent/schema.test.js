@@ -86,7 +86,7 @@ describe('content the agent may never produce', () => {
     });
   }
   for (const phrase of [
-    'This is a violation of the law', 'The landlord is liable', 'You are entitled to a refund', 'This is illegal',
+    'This is a violation of the law', 'The landlord is liable', 'You are entitled to a quick repair', 'This is illegal',
     'You may withhold rent', 'repair and deduct is available', 'You could sue', 'File a lawsuit', 'unlawful delay',
     'Texas Property Code 92.056 applies', 'terminate your lease', 'constructive eviction', 'breach of the lease',
     'speak to an attorney', 'penalties apply', 'the unit is not habitable',
@@ -149,5 +149,50 @@ describe('disclaimer', () => {
     assert.equal(extractJson('```\n{"a":1}\n```'), '{"a":1}');
     assert.equal(extractJson('x {"a":1}'), null);
     assert.equal(extractJson(null), null);
+  });
+});
+
+describe('bypass attempts found in the security review', () => {
+  const ids = new Set(['W000001', 'U0001', 'V01']);
+  for (const [name, text, want] of [
+    ['soft hyphen inside a legal word', 'vio\u00ADlation of the rules', 'hidden_chars'],
+    ['word joiner inside a legal word', 'attor\u2060ney', 'hidden_chars'],
+    ['non-breaking space in a legal phrase', 'legal\u00A0action', 'hidden_chars'],
+    ['double space in a legal phrase', 'legal  action', 'forbidden:legal'],
+    ['newline in a legal phrase', 'withhold\nrent', 'forbidden:legal'],
+    ['word joiner inside a URL', 'https\u2060://x.example', 'hidden_chars'],
+    ['a short-link domain', 'see bit.ly/abc', 'forbidden:url'],
+    ['an uncommon TLD', 'pay at pay.xyz', 'forbidden:url'],
+    ['a bare IP address', 'go to 10.0.0.1', 'forbidden:url'],
+    ['a tel: scheme', 'tel:5551234567', 'forbidden:url'],
+    ['a protocol-relative link', 'open //evil.example', 'forbidden:url'],
+    ['a phone number with no separator after the area code', 'call (555)123-4567', 'forbidden:phone'],
+    ['a phone number with slashes', '555/123/4567', 'forbidden:phone'],
+    ['a seven-digit local number', 'call 123-4567', 'forbidden:phone'],
+    ['a fullwidth at sign', 'a\uFF20b.example', 'non_normalized'],
+    ['an obfuscated email', 'name at example dot com', 'forbidden:email'],
+    ['a lowercase id from another work order', 'see w000805', 'forbidden:foreign_id'],
+    ['"legally"', 'this is legally required', 'forbidden:legal'],
+    ['"the law requires"', 'the law requires a repair', 'forbidden:legal'],
+    ['"your rights"', 'know your rights', 'forbidden:legal'],
+    ['eviction wording', 'this could lead to eviction', 'forbidden:legal'],
+    ['a markdown link', '[click here](x)', 'forbidden:markup'],
+    ['HTML', '<script>alert(1)</script>', 'forbidden:markup'],
+    ['a promise of money', 'we will credit $50 and waive fees', 'forbidden:money'],
+    ['a rent reduction', 'we will reduce your rent', 'forbidden:money'],
+    ['a Cyrillic homoglyph', 'p\u0430y now', 'forbidden:non_latin'],
+  ]) {
+    test(`rejected: ${name}`, () => assert.equal(scanText(text, ids), want));
+  }
+  test('normal drafts, rule text and plain dates still pass', () => {
+    for (const t of [
+      'Update for W000001 in unit U0001 with vendor V01. Opened 2026-11-13.',
+      'Open written-notice repair is 7.0 days old (S01: presumption threshold of 7 days reached).',
+      'Hello. This is an update on the repair request for unit U0001 (work order W000001, hvac). We will confirm the plan with you as soon as it is scheduled.',
+    ]) assert.equal(scanText(t, ids), null, t);
+  });
+  test('oversized model output is rejected before parsing', () => {
+    const big = JSON.stringify({ flags: [], drafts: [], pad: 'x'.repeat(100001) });
+    assert.equal(validateOutput(big, [W('W000001', 7)]).code, 'too_large');
   });
 });

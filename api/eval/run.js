@@ -57,7 +57,7 @@ async function mapLimit(items, limit, fn) {
 async function evalModel(model) {
   const provider = providerFor(providerName, model);
   if (!provider) {
-    console.error(`no key configured for ${providerName}`);
+    console.error(`no key configured for ${providerName}, or LLM_DATA_CLASS is not "synthetic" (the eval sends only synthetic cases)`);
     process.exit(2);
   }
   const rows = await mapLimit(EVAL_CASES, concurrency, async (c) => {

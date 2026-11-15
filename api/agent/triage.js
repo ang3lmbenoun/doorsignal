@@ -6,7 +6,7 @@ import { loadCases } from './cases.js';
 import { complete, LlmUnavailable } from './llm.js';
 import { messagesFor } from './prompt.js';
 import { triageRules } from './rules.js';
-import { finalizeDraftText, validateOutput } from './schema.js';
+import { finalizeDraftText, scanText, validateOutput } from './schema.js';
 
 export const BATCH_SIZE = 10;
 export const DEFAULT_DEADLINE_MS = 10 * 60 * 1000; // after this, remaining batches use the rules
@@ -41,7 +41,20 @@ export async function triageCases({
   const tag = (x, source) => x.map((e) => ({ ...e, source }));
   const useRules = (batch) => {
     const r = triageRules(batch);
-    flags.push(...tag(r.flags, 'rules')); drafts.push(...tag(r.drafts, 'rules'));
+    // The rules' text is built from API fields: scan it like model text, so a field that ever carried free text
+    // (a link, a phone number) cannot reach a pending draft through this path.
+    const allowed = new Set();
+    for (const c of batch) for (const id of [c.work_order_id, c.unit_id, c.vendor_id]) if (id) allowed.add(id);
+    const clean = (item, key) => {
+      const bad = scanText(item[key], allowed);
+      if (bad) {
+        if (!codes.includes('rules_text_rejected')) codes.push('rules_text_rejected');
+        log('rules text rejected', { code: bad, kind: item.kind });
+      }
+      return !bad;
+    };
+    flags.push(...tag(r.flags.filter((f) => clean(f, 'reason')), 'rules'));
+    drafts.push(...tag(r.drafts.filter((d) => clean(d, 'text')), 'rules'));
     counts.rules += 1;
   };
 

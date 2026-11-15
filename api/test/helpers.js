@@ -16,7 +16,9 @@ export const ADMIN_URL = (process.env.NEON_TEST_DATABASE_URL || process.env.NEON
 
 export function guardNotMain() {
   const main = (process.env.DATABASE_URL || '').trim();
-  if (main && hostOf(main) === hostOf(ADMIN_URL)) {
+  const mainHost = (process.env.MAIN_DATABASE_HOST || '').trim().replace('-pooler', '') || (main ? hostOf(main) : '');
+  if (!mainHost && process.env.GITHUB_ACTIONS === 'true') throw new Error('main database host unknown (set MAIN_DATABASE_HOST)');
+  if (mainHost && mainHost === hostOf(ADMIN_URL)) {
     throw new Error('Refusing to run: the test database host equals DATABASE_URL (main). Use a Neon branch.');
   }
 }

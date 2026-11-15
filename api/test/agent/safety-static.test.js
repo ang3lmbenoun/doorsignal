@@ -9,14 +9,15 @@ import './fixtures.js';
 
 const dir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../agent');
 const files = fs.readdirSync(dir).filter((f) => f.endsWith('.js'));
-// cli.js is operator wiring (mints the agent's token, then deletes the secret); everything else is agent code.
-const agentFiles = files.filter((f) => f !== 'cli.js');
+// cli.js and mint-token.js are operator wiring (mint the agent's token); everything else is agent code.
+const OPERATOR = ['cli.js', 'mint-token.js'];
+const agentFiles = files.filter((f) => !OPERATOR.includes(f));
 const strip = (src) => src.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/.*$/gm, '$1');
 const code = (f) => strip(fs.readFileSync(path.join(dir, f), 'utf8'));
 
 describe('no send path', () => {
   test('the agent directory is what we expect (a new file must be reviewed)', () => {
-    assert.deepEqual(files.sort(), ['cases.js', 'cli.js', 'client.js', 'llm.js', 'prompt.js', 'rules.js', 'schema.js', 'triage.js', 'writer.js']);
+    assert.deepEqual(files.sort(), ['cases.js', 'cli.js', 'client.js', 'env.js', 'llm.js', 'mint-token.js', 'prompt.js', 'rules.js', 'schema.js', 'triage.js', 'writer.js']);
   });
 
   test('no mail, SMS, chat, webhook, process or raw-socket module is imported anywhere', () => {
@@ -28,12 +29,13 @@ describe('no send path', () => {
   });
 
   test('imports are limited to a short allowlist', () => {
-    const allowed = new Set(['express', 'pg', 'node:crypto', 'jose']);
+    const allowed = new Set(['express', 'pg', 'node:crypto', 'node:fs', 'node:url', 'jose']);
     for (const f of files) {
       for (const m of code(f).matchAll(/from\s*['"]([^'"]+)['"]/g)) {
         const spec = m[1];
         if (spec.startsWith('./')) assert.ok(files.includes(spec.slice(2)), `${f}: unknown local import ${spec}`);
-        else if (spec.startsWith('../src/')) assert.equal(f, 'cli.js', `${f} imports API code ${spec}`);
+        else if (spec.startsWith('../src/')) assert.ok(OPERATOR.includes(f), `${f} imports API code ${spec}`);
+        else if (spec === 'jose') assert.ok(OPERATOR.includes(f), `${f} imports jose`);
         else assert.ok(allowed.has(spec), `${f} imports ${spec}`);
       }
     }
@@ -97,7 +99,8 @@ describe('no write path to ledger, leases or anything but the inbox', () => {
       const c = code(f);
       assert.ok(!/JWT_SECRET|SignJWT|jose|\.\.\/src\/db\.js|withClaims/.test(c), `${f} reaches secrets or the API db layer`);
     }
-    assert.match(code('cli.js'), /delete process\.env\.JWT_SECRET/);
+    assert.match(code('cli.js'), /delete cfg\.JWT_SECRET/);
+    assert.ok(!/process\.loadEnvFile/.test(code('cli.js')), 'cli.js must not load the whole .env');
   });
 
   test('keys are never logged or placed in an error', () => {

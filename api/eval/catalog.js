@@ -11,7 +11,7 @@ try {
 const [name = 'nvidia', ...filters] = process.argv.slice(2);
 const provider = providerFor(name, 'catalog-check');
 if (!provider) {
-  console.error(`no key configured for ${name}`);
+  console.error(`no key configured for ${name}, or LLM_DATA_CLASS is not "synthetic"`);
   process.exit(2);
 }
 const ids = await listModels(provider);

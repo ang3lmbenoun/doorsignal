@@ -10,6 +10,7 @@ export const DRAFT_KINDS = Object.freeze(['tenant_status_message', 'vendor_reass
 export const MAX_REASON = 200;
 export const MAX_TEXT = 1200;
 export const MAX_ITEMS = 200;
+export const MAX_OUTPUT = 100000; // characters of raw model output; anything larger is rejected before parsing
 
 // Appended in code (never left to the model) to every draft about a work order that has an S01 reading.
 export const DISCLAIMER =
@@ -20,34 +21,46 @@ const FLAG_KEYS = ['kind', 'reason', 'work_order_id'];
 const DRAFT_KEYS = ['kind', 'text', 'work_order_id'];
 
 // Legal conclusions are out of scope for the agent. Matching is deliberately broad: a false reject only costs a
-// fallback to the rule-based triage, a miss would put legal wording in front of a tenant.
+// fallback to the rule-based triage, a miss would put legal wording in front of a tenant. Words are joined with
+// \s+ so a double space or newline cannot split a phrase.
 const LEGAL = new RegExp(
   [
-    'violat\\w*', 'illegal\\w*', 'unlawful\\w*', 'liab\\w*', 'negligen\\w*', 'lawsuit\\w*', '\\bsue\\b', '\\bsuing\\b',
-    'legal action', 'legal right\\w*', 'entitled', 'you have the right', 'withhold(ing)? (the )?rent',
-    'repair[- ]and[- ]deduct', 'terminate (the |your )?lease', 'constructive eviction', 'habitab\\w*',
-    'breach(ed)? of (the )?(law|statute|code|lease|contract)', 'statut\\w*', 'property code', '\\b92\\.0\\d+',
-    'court', 'attorney', 'penalt\\w*', 'fines?\\b',
+    'violat\\w*', 'illegal\\w*', 'unlawful\\w*', 'legally', 'legal\\s+(action|right|rights|obligation|requirement|deadline|advice|notice|duty)',
+    'liab\\w*', 'negligen\\w*', 'lawsuit\\w*', '\\bsu(e|ed|ing)\\b', 'you\\s+have\\s+the\\s+right', 'your\\s+rights?',
+    'entitled', 'by\\s+law', 'the\\s+law\\b', 'required\\s+by', 'obligat\\w*', 'damages', 'deadline',
+    'withhold(ing)?\\s+(the\\s+)?rent', 'repair[\\s-]+and[\\s-]+deduct', 'terminate\\s+(the\\s+|your\\s+)?lease',
+    'constructive\\s+eviction', 'evict\\w*', 'habitab\\w*',
+    'breach(ed)?\\s+of\\s+(the\\s+)?(law|statute|code|lease|contract|obligation\\w*)', 'statut\\w*', 'property\\s+code',
+    '\\b92\\.0\\d+', 'court', 'attorney', 'lawyer', 'penalt\\w*', 'fines?\\b',
   ].join('|'),
   'i',
 );
-const URL_RE = /(https?:\/\/|www\.|\b[a-z0-9-]+\.(com|net|org|io|co|us|app|dev)\b)/i;
-const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/;
-// North-American style numbers and long digit runs; plain dates such as 2026-11-13 do not match.
-const PHONE_RE = /(\+?\d{1,3}[\s.-]?)?\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}|\b\d{10,}\b/;
-// Characters that hide or reorder text.
-const HIDDEN_RE = /[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f​-‏‪-‮⁦-⁩﻿]/;
+// The ledger boundary (tier T3) in prose: no amounts and no promises of money or rent changes.
+const MONEY = /\$\s?\d|\b(refund\w*|credit\w*|waiv\w*|reimburs\w*|compensat\w*|discount\w*|free\s+rent|rent\s+(reduction|abatement|credit)|reduce\s+(your\s+)?rent)\b/i;
+const EMAIL_RE = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+|\b(at|\[at\]|\(at\))\b[^.\n]{0,30}\b(dot|\[dot\]|\(dot\))\b/i;
+// A link is anything domain-shaped, an IP, a URL scheme, or a protocol-relative reference.
+const URL_RE = /\b[a-z0-9][a-z0-9-]*\.[a-z]{2,}\b|\b\d{1,3}(\.\d{1,3}){3}\b|\b(https?|ftp|tel|sms|mailto|file|data|javascript)\s*:|\/\/[a-z0-9]/i;
+// Seven or more digits, however they are separated (spaces, dots, dashes, slashes, parentheses). ISO dates are
+// removed first so a plain date is not read as a phone number.
+const PHONE_RE = /(?:\d[\s().\/-]*){7,}/;
+const ISO_DATE = /\b\d{4}-\d{2}-\d{2}\b/g;
+const MARKUP_RE = /[<>`]|\]\(/;
 // Simulator id shapes: work order W, unit U, lease L, tenant T, vendor V, property P, owner O, plus org names.
-const ID_RE = /\b(?:[WULTVPO]\d{2,8}|ORG\d+)\b/g;
+const ID_RE = /\b(?:[WULTVPO]\d{2,8}|ORG\d+)\b/gi;
 
-// The model may mention only ids that were in its input.
+// The model may mention only ids that were in its input. Text must be plain Latin-script, already NFKC-normalised,
+// with no invisible, format or unusual space characters (so no word can be split or disguised).
 export function scanText(text, allowedIds) {
-  if (HIDDEN_RE.test(text)) return 'hidden_chars';
+  if (/[\p{Cf}\p{Cc}\p{Zl}\p{Zp}]/u.test(text.replace(/[\n\r\t]/g, ' ')) || /(?! )\p{Zs}/u.test(text)) return 'hidden_chars';
+  if (text !== text.normalize('NFKC')) return 'non_normalized';
+  if (/(?!\p{Script=Latin})\p{L}|\p{M}/u.test(text)) return 'forbidden:non_latin';
+  if (MARKUP_RE.test(text)) return 'forbidden:markup';
   if (EMAIL_RE.test(text)) return 'forbidden:email'; // before URL: an address contains a domain
   if (URL_RE.test(text)) return 'forbidden:url';
-  if (PHONE_RE.test(text)) return 'forbidden:phone';
+  if (PHONE_RE.test(text.replace(ISO_DATE, ' '))) return 'forbidden:phone';
+  if (MONEY.test(text)) return 'forbidden:money';
   if (LEGAL.test(text)) return 'forbidden:legal';
-  for (const id of text.match(ID_RE) || []) if (!allowedIds.has(id)) return 'forbidden:foreign_id';
+  for (const id of text.match(ID_RE) || []) if (!allowedIds.has(id.toUpperCase())) return 'forbidden:foreign_id';
   return null;
 }
 
@@ -66,6 +79,7 @@ const exactKeys = (o, keys) =>
 
 // text: raw model output. cases: array of case objects (see cases.js). Returns {ok, value} or {ok:false, code}.
 export function validateOutput(text, cases) {
+  if (typeof text === 'string' && text.length > MAX_OUTPUT) return { ok: false, code: 'too_large' };
   const json = extractJson(text);
   if (json === null) return { ok: false, code: 'not_json' };
   let obj;

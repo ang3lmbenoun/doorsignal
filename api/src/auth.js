@@ -39,6 +39,9 @@ export async function authenticate(header, secret) {
     if (typeof v !== 'string' || !ID.test(v)) return null;
     claims[name] = v;
   }
+  // `agent.*` subjects belong to the triage agent: a token naming one without actor = 'agent' is refused, so a
+  // token cannot pass as a human approver while carrying the agent's identity.
+  if (/^agent\./i.test(claims.sub) && claims.actor !== 'agent') return null;
   for (const name of REQUIRED_CLAIMS[role]) if (!claims[name]) return null;
   return claims;
 }
