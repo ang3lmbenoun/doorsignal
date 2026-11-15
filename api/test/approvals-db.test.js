@@ -380,7 +380,7 @@ async function run() {
 
     test('the actor check fails closed: a missing, empty or unknown app.actor cannot decide', async () => {
       const s = await seed(ORG1);
-      for (const actor of ['', 'admin', 'Human', 'agent']) {
+      for (const actor of ['', 'admin', 'Human']) {
         await fails(decide('api_property_manager', { org: ORG1, user: 'u', actor }, s.approval, 'approved'), denied, `actor=${JSON.stringify(actor)}`);
       }
       // no app.actor setting at all
@@ -413,15 +413,26 @@ async function run() {
       assert.ok(!names.includes('approvals_org_status_idx'));
     });
 
-    test('an agent identity (app.actor = agent) cannot decide, whatever its role', async () => {
+    test('an agent identity (app.actor = agent) cannot decide: the row is invisible to it, so nothing changes', async () => {
       const s = await seed(ORG1);
-      await fails(
-        inTx(apiUrl, async (c) => {
-          await c.query('SET TRANSACTION READ WRITE');
-          await c.query('SET LOCAL ROLE api_property_manager');
-          await c.query("select set_config('app.org_id', $1, true), set_config('app.user_id', 'agent.triage', true), set_config('app.actor', 'agent', true)", [ORG1]);
-        }, (c) => c.query("update ops.approvals set status = 'approved' where approval_id = $1", [s.approval])),
-        denied);
+      const r = await decide('api_property_manager', { org: ORG1, user: 'agent.triage', actor: 'agent' }, s.approval, 'approved');
+      assert.equal(r.rowCount, 0); // the read policy hides inbox rows from agent actors, so the update matches nothing
+      const read = await asRole('api_property_manager', { org: ORG1, user: 'agent.triage', actor: 'agent' }, (c) => c.query('select * from ops.approvals'));
+      assert.equal(read.rowCount, 0);
+      const st = await admin.query('select status from ops.approvals where approval_id = $1', [s.approval]);
+      assert.equal(st.rows[0].status, 'pending');
+    });
+
+    test('the trigger itself refuses an agent actor and agent.* subjects (reached on the owner connection, past RLS)', async () => {
+      const s = await seed(ORG1);
+      const asOwner = (settings) =>
+        inTx(adminClientConfig().connectionString,
+          (c) => c.query("select set_config('app.actor', $1, true), set_config('app.user_id', $2, true)", settings),
+          (c) => c.query("update ops.approvals set status = 'approved' where approval_id = $1", [s.approval]));
+      await fails(asOwner(['agent', 'someone']), denied);
+      await fails(asOwner(['human', 'agent.triage']), denied); // reserved subject, even with actor human
+      await fails(asOwner(['', 'someone']), denied);
+      await fails(asOwner(['human', '']), denied); // no approver identity
       const st = await admin.query('select status from ops.approvals where approval_id = $1', [s.approval]);
       assert.equal(st.rows[0].status, 'pending');
     });
