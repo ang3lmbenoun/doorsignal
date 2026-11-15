@@ -39,6 +39,21 @@ export function loadProviders(env = process.env) {
   return out;
 }
 
+// One provider with an explicit model, for the eval (so provider URLs stay in this file). Null if no key is set.
+export function providerFor(name, model, env = process.env) {
+  const p = KNOWN[name];
+  const key = p ? (env[p.keyEnv] || '').trim() : '';
+  return p && key && model ? { name, baseUrl: p.baseUrl, key, model } : null;
+}
+
+// Model ids the provider offers (GET {baseUrl}/models). Used to verify ids before an eval; never guess an id.
+export async function listModels(provider, transport = (...a) => fetch(...a)) {
+  const res = await transport(`${provider.baseUrl}/models`, { method: 'GET', headers: { authorization: `Bearer ${provider.key}` } });
+  if (!res.ok) throw new Error(`model catalog request failed with status ${res.status}`);
+  const body = await res.json();
+  return (body.data || []).map((m) => m.id).filter((id) => typeof id === 'string');
+}
+
 const RETRYABLE = (status) => status === 429 || (status >= 500 && status <= 599);
 const defaultSleep = (ms) => new Promise((r) => setTimeout(r, ms));
 

@@ -39,10 +39,10 @@ describe('no send path', () => {
     }
   });
 
-  test('the only HTTP POST is the model call in llm.js; client.js is GET only', () => {
+  test('the only HTTP POST is the model call in llm.js (plus its catalog GET); client.js is GET only', () => {
     for (const f of agentFiles) {
       const methods = [...code(f).matchAll(/method:\s*['"]([A-Z]+)['"]/g)].map((m) => m[1]);
-      if (f === 'llm.js') assert.deepEqual(methods, ['POST']);
+      if (f === 'llm.js') assert.deepEqual(methods.sort(), ['GET', 'POST']); // POST: model call; GET: model catalog list
       else if (f === 'client.js') assert.deepEqual(methods, ['GET']);
       else assert.deepEqual(methods, [], `${f} makes HTTP calls`);
     }
