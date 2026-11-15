@@ -56,7 +56,8 @@ def set_password(conn, role: str = "api_login") -> None:
     password = os.environ.get(var, "")
     if len(password) < 24:
         raise ConfigError(f"{var} is not set or shorter than 24 characters.")
-    conn.execute(sql.SQL("alter role {} password {}").format(sql.Identifier(role), sql.Literal(password)))
+    stmt = sql.SQL("alter role {} password {}").format(sql.Identifier(role), sql.Literal(password))
+    conn.execute(stmt)
     print(f"{role} password set")
 
 
