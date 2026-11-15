@@ -117,14 +117,28 @@ Also asserted: every schema except `serving` is closed to every API role (enumer
 
 First run on the branch found one real leak, fixed before the pass above: S12 row-drift rows for `ground_truth.*` tables (names and row counts) were served to data_owner.
 
-## Policy-mutation check for the approval inbox (M5b, incomplete)
-Run on the Neon branch `m5a-rls-test` only, with the DB-backed tests (leaks, approvals-db, approvals-api, agent e2e: 285 tests). Each mutation is applied, the tests run, and `30`-`33` re-applied with the restored state compared against a snapshot of policies, grants, column grants, schema usage, memberships and triggers. **Only 3 of the 10 planned mutations ran.** The branch owner password was rejected during the run (the cause is unknown; mutation 10 hung), so mutations 10 to 16 were not run and the branch could not be restored afterwards.
+## Policy-mutation check, all 16 mutations (M5b)
+Run with `python -m ingest.mutation_check` on Neon branch `m5b-verify` (direct host, not main), serially, one test process at a time. Each mutation was applied, the full suite (521 tests, 36 suites) run, the branch restored with `30`-`33`, the restored state compared against a snapshot taken before any mutation (policies, grants, column grants, schema usage, memberships, triggers), and the suite run again. **For all 16 the restored state was identical to the baseline and the re-run was 521/521 green.** Raw results: `docs/api-mutations.json`. A mutation is "caught" when at least one test fails with it applied.
 
-| # | Mutation | Cases failed | Caught |
-|---|---|---|---|
-| 7 | `api_agent_writer` gets UPDATE on `ops.approvals` | 2 | yes ("cannot UPDATE approvals (self-approve)", "exactly INSERT on the three inbox tables") |
-| 8 | approver read policy on approvals: org filter replaced by `true` | 6 | yes (inbox shown across orgs; cross-org decide returns 200 not 404) |
-| 9 | approver decide policy: org filter removed | 0 | **no, and no observable change**: an UPDATE also needs the SELECT policy `h_approvals_read` (still org-filtered) and the approvals trigger reads the action through the org-filtered `h_actions`, so the decide policy's org filter is a redundant layer. Not a leak, and not testable without also removing those layers |
-| 10 to 16 | leasing_manager SELECT on approvals; trigger dropped; writer insert policy loosened; writer INSERT on `serving.leases`; actions org check removed; actions append-only trigger dropped; data_owner SELECT on actions | not run | - |
+| # | What changed | Result | Tests failing | Notes |
+|---|---|---|---|---|
+| 1 | `all_signals`, property_manager: org filter replaced by `true` | caught | 5 | 833 cross-org leaks counted |
+| 2 | `all_signals`, owner: owner_id condition dropped | caught | 3 | 631 leaks counted |
+| 3 | `leases`, leasing_manager: policy removed, SELECT granted | caught | 2 | |
+| 4 | `all_signals`, maintenance_coordinator: signal filter removed | caught | 4 | 480 leaks counted |
+| 5 | USAGE on schema `ground_truth` to data_owner | caught | 2 | |
+| 6 | `api_data_owner` granted to `api_login` with inherit and set | caught | 1 | |
+| 7 | `api_agent_writer` gets UPDATE on `ops.approvals` | caught | 2 | |
+| 8 | approver read policy on approvals: org filter replaced by `true` | caught | 7 | |
+| 9 | approver decide policy on approvals: org filter removed | **equivalent (defence in depth)** | 0 | Not "caught". An UPDATE also needs the SELECT policy `h_approvals_read` (still org-filtered) and the guard trigger reads the action through the org-filtered `h_actions`, so the decide policy's org filter is a redundant layer. Not a leak, and not observable without also removing those layers |
+| 10 | leasing_manager gets SELECT on `ops.approvals` | caught | 1 | |
+| 11 | `approvals_guard` trigger dropped | caught | 26 | |
+| 12 | writer insert policy on approvals: `status = 'pending'` condition removed | **SURVIVED** | 0 | Test gap, not yet closed; see below |
+| 13 | `api_agent_writer` gets INSERT on `serving.leases` | caught | 1 | |
+| 14 | writer insert policy on agent_actions: org check removed (`with check (true)`) | **SURVIVED** | 0 | Test gap, not yet closed; see below |
+| 15 | `agent_actions` append-only trigger dropped | caught | 1 | |
+| 16 | data_owner gets SELECT on `ops.agent_actions` plus schema usage | caught | 3 | |
 
-Mutations 10 to 16 must be run before this table can be called complete. Mutation 10 (a bare SELECT grant on `ops.approvals` for leasing_manager) may turn out to be unobservable like 9, because that role has no USAGE on schema `ops`; I have not checked.
+**Counts:** 13 caught, 1 equivalent (9), 2 survivors (12, 14).
+
+**Survivors 12 and 14 are reported as survivors.** With either policy weakened, all 521 tests still pass, so no test currently proves that the writer cannot insert an approval that is already `approved`/`rejected`, or an action row for another org. Both are listed as open work for M5c (add a DB test per mutation, then re-run these two); until then the corresponding protections rest on other layers I have not shown to be sufficient. Not claimed as caught. Six M5a mutations plus ten M5b mutations are a sample, not a proof that every possible weakening is caught.

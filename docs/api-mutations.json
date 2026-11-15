@@ -1,0 +1,441 @@
+[
+ {
+  "id": 1,
+  "what": "serving.all_signals, property_manager: org_id = org replaced by true",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 516,
+   "fail": 5,
+   "skipped": 0,
+   "leaks": 833,
+   "failing": [
+    "matrix has at least 40 cases and no leak was counted",
+    "property_manager/ORG1 GET /v1/signals",
+    "property_manager/ORG1 foreign id on /v1/signals",
+    "property_manager/ORG2 GET /v1/signals",
+    "property_manager/ORG2 foreign id on /v1/signals"
+   ],
+   "exit": 1
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ },
+ {
+  "id": 2,
+  "what": "serving.all_signals, owner: owner_id condition dropped (org only)",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 518,
+   "fail": 3,
+   "skipped": 0,
+   "leaks": 631,
+   "failing": [
+    "matrix has at least 40 cases and no leak was counted",
+    "owner/ORG1 GET /v1/signals",
+    "owner/ORG2 GET /v1/signals"
+   ],
+   "exit": 1
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ },
+ {
+  "id": 3,
+  "what": "serving.leases, leasing_manager: policy removed, select granted anyway",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 519,
+   "fail": 2,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [
+    "leasing_manager/ORG1 GET /v1/leases",
+    "leasing_manager/ORG2 GET /v1/leases"
+   ],
+   "exit": 1
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ },
+ {
+  "id": 4,
+  "what": "serving.all_signals, maintenance_coordinator: signal_id filter removed (all signals)",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 517,
+   "fail": 4,
+   "skipped": 0,
+   "leaks": 480,
+   "failing": [
+    "maintenance_coordinator/ORG1 GET /v1/signals",
+    "maintenance_coordinator/ORG2 GET /v1/signals",
+    "matrix has at least 40 cases and no leak was counted",
+    "the agent token reads only its own org and only the signals its role allows"
+   ],
+   "exit": 1
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ },
+ {
+  "id": 5,
+  "what": "grant usage on schema ground_truth to api_data_owner",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 519,
+   "fail": 2,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [
+    "api_data_owner: no USAGE on schema, no SELECT on any ground_truth table",
+    "every schema except serving is closed to every API role (enumerated from pg_namespace)"
+   ],
+   "exit": 1
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ },
+ {
+  "id": 6,
+  "what": "grant api_data_owner to api_login with inherit true, set true",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 520,
+   "fail": 1,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [
+    "api_login does not inherit the group roles"
+   ],
+   "exit": 1
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ },
+ {
+  "id": 7,
+  "what": "api_agent_writer gets UPDATE on ops.approvals (self-approve path)",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 519,
+   "fail": 2,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [
+    "cannot: UPDATE approvals (self-approve)",
+    "exactly INSERT on the three inbox tables and nothing else on any table"
+   ],
+   "exit": 1
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ },
+ {
+  "id": 8,
+  "what": "ops.approvals read policy for approvers: org filter replaced by true",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 514,
+   "fail": 7,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [
+    "an agent identity (app.actor = agent) cannot decide: the row is invisible to it, so nothing changes",
+    "maintenance_coordinator/ORG1: cannot approve another org's draft (404, still pending)",
+    "maintenance_coordinator/ORG2: cannot approve another org's draft (404, still pending)",
+    "maintenance_coordinator: sees only its own org's inbox",
+    "property_manager/ORG1: cannot approve another org's draft (404, still pending)",
+    "property_manager/ORG2: cannot approve another org's draft (404, still pending)",
+    "property_manager: sees only its own org's inbox"
+   ],
+   "exit": 1
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ },
+ {
+  "id": 9,
+  "what": "ops.approvals decide policy for approvers: org filter removed",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ },
+ {
+  "id": 10,
+  "what": "leasing_manager gets SELECT on ops.approvals (no schema usage)",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 520,
+   "fail": 1,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [
+    "api_leasing_manager: no relation outside serving is selectable, vendor_signals included"
+   ],
+   "exit": 1
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ },
+ {
+  "id": 11,
+  "what": "approvals_guard trigger dropped (decision fields forgeable, no actor check)",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 495,
+   "fail": 26,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [
+    "approvals are never deleted, and a decided approval cannot be changed, even by the owner",
+    "maintenance_coordinator/ORG1: approve records who, role, when, exact text and hash",
+    "maintenance_coordinator/ORG1: reject records the decision",
+    "maintenance_coordinator/ORG2: approve records who, role, when, exact text and hash",
+    "maintenance_coordinator/ORG2: reject records the decision",
+    "maintenance_coordinator: a decision is final (second approve and reject give 409, nothing changes)",
+    "maintenance_coordinator: a second decision changes nothing",
+    "maintenance_coordinator: approve records who, role, when and the exact draft text and hash",
+    "maintenance_coordinator: can change status only, to approved or rejected only",
+    "maintenance_coordinator: no approver identity means no decision",
+    "maintenance_coordinator: reject works and records the same fields",
+    "property_manager/ORG1: approve records who, role, when, exact text and hash",
+    "property_manager/ORG1: reject records the decision",
+    "property_manager/ORG2: approve records who, role, when, exact text and hash",
+    "property_manager/ORG2: reject records the decision",
+    "property_manager: a decision is final (second approve and reject give 409, nothing changes)",
+    "property_manager: a second decision changes nothing",
+    "property_manager: approve records who, role, when and the exact draft text and hash",
+    "property_manager: can change status only, to approved or rejected only",
+    "property_manager: no approver identity means no decision",
+    "property_manager: reject works and records the same fields",
+    "status filter returns only that status",
+    "the actor check fails closed: a missing, empty or unknown app.actor cannot decide",
+    "the decider is the token sub; a body or header cannot change it",
+    "the decision snapshot equals the stored draft even if a caller tries to supply other values",
+    "the trigger itself refuses an agent actor and agent.* subjects (reached on the owner connection, past RLS)"
+   ],
+   "exit": 1
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ },
+ {
+  "id": 12,
+  "what": "writer insert policy on approvals: status = 'pending' condition removed",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ },
+ {
+  "id": 13,
+  "what": "api_agent_writer gets INSERT on serving.leases (a lease write path)",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 520,
+   "fail": 1,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [
+    "exactly INSERT on the three inbox tables and nothing else on any table"
+   ],
+   "exit": 1
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ },
+ {
+  "id": 14,
+  "what": "writer insert policy on agent_actions: org check removed",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ },
+ {
+  "id": 15,
+  "what": "agent_actions append-only trigger dropped",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 520,
+   "fail": 1,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [
+    "UPDATE and DELETE on agent_actions and agent_runs are refused even for the owner"
+   ],
+   "exit": 1
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ },
+ {
+  "id": 16,
+  "what": "data_owner gets SELECT on ops.agent_actions (and usage on schema ops)",
+  "with_mutation": {
+   "tests": 521,
+   "pass": 518,
+   "fail": 3,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [
+    "api_data_owner: no relation outside serving is selectable, vendor_signals included",
+    "every schema except serving is closed to every API role (enumerated from pg_namespace)",
+    "roles without a grant (owner, leasing_manager, data_owner, api_login) cannot touch the inbox"
+   ],
+   "exit": 1
+  },
+  "restored_identical": true,
+  "rerun_after_restore": {
+   "tests": 521,
+   "pass": 521,
+   "fail": 0,
+   "skipped": 0,
+   "leaks": 0,
+   "failing": [],
+   "exit": 0
+  }
+ }
+]
