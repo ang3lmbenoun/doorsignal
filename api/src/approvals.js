@@ -30,8 +30,9 @@ export function approvalsRouter(pool) {
     req.endpointTable = 'ops.approvals'; // for the 403 log line
     next();
   });
+  // Agent tokens (actor = 'agent') never touch the inbox, even with an approver role; the database refuses too.
   const guardRole = (req, res, next) =>
-    APPROVER_ROLES.has(req.claims.role) ? next() : reply(res, 403, 'forbidden');
+    APPROVER_ROLES.has(req.claims.role) && req.claims.actor !== 'agent' ? next() : reply(res, 403, 'forbidden');
 
   router.get('/', guardRole, async (req, res, next) => {
     try {

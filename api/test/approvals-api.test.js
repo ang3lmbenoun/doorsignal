@@ -155,6 +155,28 @@ async function run() {
       assert.equal(row.draft_text_at_decision, s.text);
     });
 
+    test('an agent-actor token cannot read or decide the inbox, even with an approver role', async () => {
+      const s = await seed(ORG1);
+      const token = await mint({ role: 'maintenance_coordinator', org_id: ORG1, sub: 'agent.triage', actor: 'agent' });
+      const h = { authorization: `Bearer ${token}` };
+      assert.equal((await fetch(`${base}/v1/approvals`, { headers: h })).status, 403);
+      assert.equal((await fetch(`${base}/v1/approvals/${s.approval}`, { headers: h })).status, 403);
+      assert.equal((await fetch(`${base}/v1/approvals/${s.approval}/approve`, { method: 'POST', headers: h })).status, 403);
+      assert.equal((await fetch(`${base}/v1/approvals/${s.approval}/reject`, { method: 'POST', headers: h })).status, 403);
+      assert.deepEqual(await dbStatus(s.approval), { status: 'pending', decided_by: null });
+    });
+
+    test('an unknown actor value is a bad token', async () => {
+      const token = await mint({ role: 'maintenance_coordinator', org_id: ORG1, actor: 'superuser' });
+      assert.equal((await fetch(`${base}/v1/leases`, { headers: { authorization: `Bearer ${token}` } })).status, 401);
+    });
+
+    test('an agent-actor token can still read the data endpoints it needs (T0)', async () => {
+      const token = await mint({ role: 'maintenance_coordinator', org_id: ORG1, sub: 'agent.triage', actor: 'agent' });
+      const res = await fetch(`${base}/v1/work-orders?limit=1`, { headers: { authorization: `Bearer ${token}` } });
+      assert.equal(res.status, 200);
+    });
+
     test('status filter returns only that status', async () => {
       await reset();
       const a = await seed(ORG1); await seed(ORG1);

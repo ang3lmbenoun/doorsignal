@@ -103,6 +103,11 @@ begin
     if tg_op = 'DELETE' then
         raise exception 'approvals are never deleted' using errcode = '42501';
     end if;
+    -- A token minted for the triage agent (claim actor = 'agent', sent as app.actor) can read as a
+    -- maintenance_coordinator but can never decide an approval, so the agent cannot approve its own drafts.
+    if coalesce(current_setting('app.actor', true), '') = 'agent' then
+        raise exception 'an agent identity cannot decide approvals' using errcode = '42501';
+    end if;
     if old.status <> 'pending' then
         raise exception 'approval already decided' using errcode = '23514';
     end if;

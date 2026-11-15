@@ -26,7 +26,9 @@ export async function authenticate(header, secret) {
   }
   const role = payload.role;
   if (typeof role !== 'string' || !Object.hasOwn(ROLES, role)) return null;
-  const claims = { role, org_id: '', owner_id: '', sub: '' };
+  // actor: 'agent' marks a token minted for the triage agent. Anything else present is refused.
+  if (payload.actor !== undefined && payload.actor !== 'agent') return null;
+  const claims = { role, org_id: '', owner_id: '', sub: '', actor: payload.actor === 'agent' ? 'agent' : 'human' };
   if (payload.sub !== undefined) {
     if (typeof payload.sub !== 'string' || !SUB.test(payload.sub)) return null;
     claims.sub = payload.sub;

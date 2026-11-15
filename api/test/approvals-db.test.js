@@ -364,6 +364,19 @@ async function run() {
       assert.deepEqual(r.rows, []);
     });
 
+    test('an agent identity (app.actor = agent) cannot decide, whatever its role', async () => {
+      const s = await seed(ORG1);
+      await fails(
+        inTx(apiUrl, async (c) => {
+          await c.query('SET TRANSACTION READ WRITE');
+          await c.query('SET LOCAL ROLE api_property_manager');
+          await c.query("select set_config('app.org_id', $1, true), set_config('app.user_id', 'agent.triage', true), set_config('app.actor', 'agent', true)", [ORG1]);
+        }, (c) => c.query("update ops.approvals set status = 'approved' where approval_id = $1", [s.approval])),
+        denied);
+      const st = await admin.query('select status from ops.approvals where approval_id = $1', [s.approval]);
+      assert.equal(st.rows[0].status, 'pending');
+    });
+
     test('the decision snapshot equals the stored draft even if a caller tries to supply other values', async () => {
       const s = await seed(ORG1, 'Snapshot test. Rebuttable presumption, not a legal finding.');
       const r = await decide('api_maintenance_coordinator', { org: ORG1, user: 'snap' }, s.approval, 'approved');

@@ -27,8 +27,9 @@ export async function withClaims(pool, claims, fn, { write = false } = {}) {
     if (write) await client.query('SET TRANSACTION READ WRITE');
     await client.query(`SET LOCAL ROLE ${role}`);
     await client.query(
-      "SELECT set_config('app.org_id', $1, true), set_config('app.owner_id', $2, true), set_config('app.user_id', $3, true)",
-      [claims.org_id, claims.owner_id, claims.sub || ''],
+      `SELECT set_config('app.org_id', $1, true), set_config('app.owner_id', $2, true),
+              set_config('app.user_id', $3, true), set_config('app.actor', $4, true)`,
+      [claims.org_id, claims.owner_id, claims.sub || '', claims.actor || 'human'],
     );
     const result = await fn(client);
     await client.query('COMMIT');
