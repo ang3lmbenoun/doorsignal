@@ -13,21 +13,23 @@ export function createPool(databaseUrl) {
   return pool;
 }
 
-// Every request runs in ONE read-only transaction: SET LOCAL ROLE + transaction-local claims, then the query.
+// Every request runs in ONE transaction (read-only unless `write` is set, which only the approval decision uses): SET LOCAL ROLE + transaction-local claims, then the query.
 // SET LOCAL ends with the transaction, so no role or claim can carry over to another request on the same
 // connection. The role identifier is taken from the fixed ROLES map.
-export async function withClaims(pool, claims, fn) {
+export async function withClaims(pool, claims, fn, { write = false } = {}) {
   const role = ROLES[claims.role];
   if (!role) throw new Error('unknown role');
   const client = await pool.connect();
   let broken = false;
   try {
-    await client.query('BEGIN READ ONLY');
+    // api_login defaults to read-only transactions; only a caller that asks for `write` gets a read-write one.
+    await client.query(write ? 'BEGIN' : 'BEGIN READ ONLY');
+    if (write) await client.query('SET TRANSACTION READ WRITE');
     await client.query(`SET LOCAL ROLE ${role}`);
-    await client.query("SELECT set_config('app.org_id', $1, true), set_config('app.owner_id', $2, true)", [
-      claims.org_id,
-      claims.owner_id,
-    ]);
+    await client.query(
+      "SELECT set_config('app.org_id', $1, true), set_config('app.owner_id', $2, true), set_config('app.user_id', $3, true)",
+      [claims.org_id, claims.owner_id, claims.sub || ''],
+    );
     const result = await fn(client);
     await client.query('COMMIT');
     return result;

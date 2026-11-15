@@ -4,6 +4,7 @@ import { REQUIRED_CLAIMS, ROLES } from './roles.js';
 export const ISSUER = 'doorsignal';
 export const AUDIENCE = 'doorsignal-api';
 const ID = /^[A-Za-z0-9_-]{1,32}$/;
+const SUB = /^[A-Za-z0-9_.@-]{1,64}$/;
 
 // Verifies a bearer token (HS256 only, exp required) and returns clean claims, or null.
 export async function authenticate(header, secret) {
@@ -25,7 +26,11 @@ export async function authenticate(header, secret) {
   }
   const role = payload.role;
   if (typeof role !== 'string' || !Object.hasOwn(ROLES, role)) return null;
-  const claims = { role, org_id: '', owner_id: '' };
+  const claims = { role, org_id: '', owner_id: '', sub: '' };
+  if (payload.sub !== undefined) {
+    if (typeof payload.sub !== 'string' || !SUB.test(payload.sub)) return null;
+    claims.sub = payload.sub;
+  }
   for (const name of ['org_id', 'owner_id']) {
     const v = payload[name];
     if (v === undefined) continue;
