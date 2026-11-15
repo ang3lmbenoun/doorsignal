@@ -48,7 +48,9 @@ jobs:
         run: python -m ingest.check_connection --skip-if-unset
 
   api-leaks:
-    # M5a leak matrix against a Neon BRANCH (never main). Secrets are scoped to the steps that need them.
+    # M5a/M5b API tests against the Neon branch behind NEON_CI_DATABASE_URL (the api-ci branch, never main).
+    # The job rebuilds that branch from scratch (raw load + full dbt chain), so it does not depend on what the
+    # branch already contains. Secrets are scoped to the steps that need them.
     # Skips cleanly when NEON_CI_DATABASE_URL is unset, except on main, where a skip fails the run: a green
     # run with no isolation test is not allowed to look like a pass.
     runs-on: ubuntu-latest
@@ -86,25 +88,50 @@ jobs:
       - name: npm audit (production dependencies)
         if: env.HAS_CI_DB == 'true'
         run: npm audit --omit=dev --prefix api
-      - name: API roles and password on the CI branch
-        # DATABASE_URL here is main, only so the never-main guard in ingest.api_sql can compare against it.
+      - name: Guard - the CI database must not be main
+        # DATABASE_URL here is main, only so the guard in ingest.api_sql can compare hosts. Runs before anything
+        # that writes: the steps below truncate and rebuild the CI branch.
         if: env.HAS_CI_DB == 'true'
         env:
           NEON_CI_DATABASE_URL: ${{ secrets.NEON_CI_DATABASE_URL }}
-          API_LOGIN_PASSWORD: ${{ secrets.API_LOGIN_PASSWORD }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-        run: |
-          python -m ingest.api_sql roles --url-env NEON_CI_DATABASE_URL
-          python -m ingest.api_sql password --url-env NEON_CI_DATABASE_URL
-      - name: Build serving layer on the CI branch
+        run: python -m ingest.api_sql guard --url-env NEON_CI_DATABASE_URL
+      - name: Load raw data on the CI branch (schemas, simulator seed, empty HUD reference table)
+        # The branch does not need to contain anything beforehand: this rebuilds it from the committed seed.
+        # The HUD xlsx is not in the repo, so rents fall back to the simulator multiplier (safmr_rent is null).
         if: env.HAS_CI_DB == 'true'
         env:
           DATABASE_URL: ${{ secrets.NEON_CI_DATABASE_URL }}
-        run: python -m ingest.run_dbt build --select org_map path:models/serving
-      - name: Leak tests
+        run: |
+          python -m ingest.init_db --with-ref-tables
+          python -m ingest.load_sim
+      - name: API roles and passwords on the CI branch
         if: env.HAS_CI_DB == 'true'
         env:
           NEON_CI_DATABASE_URL: ${{ secrets.NEON_CI_DATABASE_URL }}
           API_LOGIN_PASSWORD: ${{ secrets.API_LOGIN_PASSWORD }}
+          AGENT_WRITER_PASSWORD: ${{ secrets.AGENT_WRITER_PASSWORD }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+        run: |
+          python -m ingest.api_sql roles --url-env NEON_CI_DATABASE_URL
+          python -m ingest.api_sql ops --url-env NEON_CI_DATABASE_URL
+          python -m ingest.api_sql password --url-env NEON_CI_DATABASE_URL
+          python -m ingest.api_sql password --role api_agent_writer --url-env NEON_CI_DATABASE_URL
+      - name: Full dbt build on the CI branch (staging to serving; re-applies serving RLS afterwards)
+        if: env.HAS_CI_DB == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.NEON_CI_DATABASE_URL }}
+        run: python -m ingest.run_dbt build
+      - name: No LLM key is present in the test environment
+        # Agent tests use fake or recorded providers only; a live key must never reach them.
+        if: env.HAS_CI_DB == 'true'
+        run: |
+          if env | grep -E '^(NVIDIA|GOOGLE|OPENROUTER|ANTHROPIC|GROQ)_API_KEY=.+'; then echo "LLM key found"; exit 1; fi
+      - name: Leak, approval and agent tests
+        if: env.HAS_CI_DB == 'true'
+        env:
+          NEON_CI_DATABASE_URL: ${{ secrets.NEON_CI_DATABASE_URL }}
+          API_LOGIN_PASSWORD: ${{ secrets.API_LOGIN_PASSWORD }}
+          AGENT_WRITER_PASSWORD: ${{ secrets.AGENT_WRITER_PASSWORD }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
         run: npm run test:leaks --prefix api

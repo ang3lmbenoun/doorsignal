@@ -1,4 +1,11 @@
-"""Create the layer schemas in Neon. Safe to rerun. Usage: python -m ingest.init_db"""
+"""Create the layer schemas in Neon. Safe to rerun.
+
+Usage: python -m ingest.init_db [--with-ref-tables]
+
+--with-ref-tables also creates the (empty) raw.ref_hud_safmr and ops.load_log tables, for databases
+that never loaded the HUD file (CI). The staging models read raw.ref_hud_safmr, and rents then fall
+back to the simulator.
+"""
 import sys
 from pathlib import Path
 
@@ -9,9 +16,13 @@ EXPECTED = {"raw", "staging", "intermediate", "marts", "signals", "risk", "ops",
 
 
 def main() -> int:
+    with_ref = "--with-ref-tables" in sys.argv[1:]
     try:
         with connect() as conn, conn.cursor() as cur:
             cur.execute(SQL_FILE.read_text())
+            if with_ref:
+                ref_sql = Path(__file__).parent / "sql" / "20_raw_ref.sql"
+                cur.execute(ref_sql.read_text(encoding="utf-8"))
             cur.execute(
                 "select schema_name from information_schema.schemata where schema_name = any(%s)",
                 (sorted(EXPECTED),),

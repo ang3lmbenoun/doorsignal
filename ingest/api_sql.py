@@ -3,6 +3,7 @@
     python -m ingest.api_sql roles   # 30_api_roles.sql (once per database)
     python -m ingest.api_sql rls     # 31_serving_rls.sql (after every dbt build)
     python -m ingest.api_sql all
+    python -m ingest.api_sql guard     # exit 0 only if the target is not the main database
     python -m ingest.api_sql password  # api_login password from API_LOGIN_PASSWORD (never printed)
 
 The target URL is read from the env var named by --url-env (default NEON_TEST_DATABASE_URL).
@@ -71,7 +72,7 @@ def apply(conn, which: str) -> None:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("which", choices=["roles", "rls", "ops", "all", "password"])
+    ap.add_argument("which", choices=["guard", "roles", "rls", "ops", "all", "password"])
     ap.add_argument("--url-env", default="NEON_TEST_DATABASE_URL")
     ap.add_argument("--role", default="api_login", help="role for the password command")
     args = ap.parse_args(argv)
@@ -80,6 +81,9 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 2
+    if args.which == "guard":
+        print("target is not the main database")
+        return 0
     with psycopg.connect(url, connect_timeout=15, autocommit=True) as conn:
         if args.which == "password":
             set_password(conn, args.role)
