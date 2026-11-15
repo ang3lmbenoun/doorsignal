@@ -7,7 +7,7 @@
 -- empty setting matches no row. Policies are per role; a role with no policy on a table sees nothing.
 --   owner                   own owner_id and org
 --   property_manager        own org
---   maintenance_coordinator own org; work orders, signals S01/S02/S08
+--   maintenance_coordinator own org; work orders, signals S01/S02/S08/S09
 --   leasing_manager         own org; leases, signals S03/S04
 --   data_owner              all rows (the only cross-org role)
 -- Table owner (the dbt role) is not forced under RLS, so dbt tests and the leak-test oracle can read all rows.
@@ -26,7 +26,7 @@ declare
     rules text[][] := array[
         ['all_signals', 'owner',                   format('owner_id = %s and org_id = %s', own, org)],
         ['all_signals', 'property_manager',        format('org_id = %s', org)],
-        ['all_signals', 'maintenance_coordinator', format('org_id = %s and signal_id in (''S01'', ''S02'', ''S08'')', org)],
+        ['all_signals', 'maintenance_coordinator', format('org_id = %s and signal_id in (''S01'', ''S02'', ''S08'', ''S09'')', org)],
         ['all_signals', 'leasing_manager',         format('org_id = %s and signal_id in (''S03'', ''S04'')', org)],
         ['all_signals', 'data_owner',              'true'],
 

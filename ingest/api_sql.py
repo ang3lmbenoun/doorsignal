@@ -19,6 +19,8 @@ from ingest.db import ROOT, ConfigError
 
 SQL_DIR = ROOT / "ingest" / "sql"
 FILES = {"roles": "30_api_roles.sql", "rls": "31_serving_rls.sql"}
+OPS_FILES = ["32_ops_approvals.sql", "33_ops_rls.sql"]
+PASSWORD_ENV = {"api_login": "API_LOGIN_PASSWORD", "api_agent_writer": "AGENT_WRITER_PASSWORD"}
 
 
 def _host(url: str) -> str:
@@ -45,26 +47,32 @@ def role_exists(conn, name: str) -> bool:
     return conn.execute("select 1 from pg_roles where rolname = %s", (name,)).fetchone() is not None
 
 
-def set_password(conn) -> None:
+def set_password(conn, role: str = "api_login") -> None:
     from psycopg import sql
 
-    password = os.environ.get("API_LOGIN_PASSWORD", "")
+    if role not in PASSWORD_ENV:
+        raise ConfigError(f"No password variable is defined for role {role}.")
+    var = PASSWORD_ENV[role]
+    password = os.environ.get(var, "")
     if len(password) < 24:
-        raise ConfigError("API_LOGIN_PASSWORD is not set or shorter than 24 characters.")
-    conn.execute(sql.SQL("alter role api_login password {}").format(sql.Literal(password)))
-    print("api_login password set")
+        raise ConfigError(f"{var} is not set or shorter than 24 characters.")
+    conn.execute(sql.SQL("alter role {} password {}").format(sql.Identifier(role), sql.Literal(password)))
+    print(f"{role} password set")
 
 
 def apply(conn, which: str) -> None:
-    for key in (["roles", "rls"] if which == "all" else [which]):
-        conn.execute((SQL_DIR / FILES[key]).read_text(encoding="utf-8"))
-        print(f"applied {FILES[key]}")
+    keys = {"all": ["roles", "rls", "ops"]}.get(which, [which])
+    for key in keys:
+        for name in (OPS_FILES if key == "ops" else [FILES[key]]):
+            conn.execute((SQL_DIR / name).read_text(encoding="utf-8"))
+            print(f"applied {name}")
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("which", choices=["roles", "rls", "all", "password"])
+    ap.add_argument("which", choices=["roles", "rls", "ops", "all", "password"])
     ap.add_argument("--url-env", default="NEON_TEST_DATABASE_URL")
+    ap.add_argument("--role", default="api_login", help="role for the password command")
     args = ap.parse_args(argv)
     try:
         url = target_url(args.url_env)
@@ -73,7 +81,7 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     with psycopg.connect(url, connect_timeout=15, autocommit=True) as conn:
         if args.which == "password":
-            set_password(conn)
+            set_password(conn, args.role)
         else:
             apply(conn, args.which)
     return 0
