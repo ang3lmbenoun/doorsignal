@@ -57,8 +57,8 @@ async function run() {
       async (c) => {
         await c.query('SET TRANSACTION READ WRITE');
         await c.query(`SET LOCAL ROLE ${role}`);
-        await c.query("select set_config('app.org_id', $1, true), set_config('app.user_id', $2, true)", [
-          ctx.org ?? '', ctx.user ?? '',
+        await c.query("select set_config('app.org_id', $1, true), set_config('app.user_id', $2, true), set_config('app.actor', $3, true)", [
+          ctx.org ?? '', ctx.user ?? '', ctx.actor ?? 'human',
         ]);
       },
       fn,
@@ -362,6 +362,41 @@ async function run() {
         `select r.rolname from pg_roles r, unnest(array['ops.agent_runs','ops.agent_actions','ops.approvals']) t
          where r.rolname like 'api\\_%' and has_table_privilege(r.rolname, t, 'TRUNCATE')`);
       assert.deepEqual(r.rows, []);
+    });
+
+    test('the actor check fails closed: a missing, empty or unknown app.actor cannot decide', async () => {
+      const s = await seed(ORG1);
+      for (const actor of ['', 'admin', 'Human', 'agent']) {
+        await fails(decide('api_property_manager', { org: ORG1, user: 'u', actor }, s.approval, 'approved'), denied, `actor=${JSON.stringify(actor)}`);
+      }
+      // no app.actor setting at all
+      await fails(
+        inTx(apiUrl, async (c) => {
+          await c.query('SET TRANSACTION READ WRITE');
+          await c.query('SET LOCAL ROLE api_property_manager');
+          await c.query("select set_config('app.org_id', $1, true), set_config('app.user_id', 'u', true)", [ORG1]);
+        }, (c) => c.query("update ops.approvals set status = 'approved' where approval_id = $1", [s.approval])),
+        denied);
+      const st = await admin.query('select status from ops.approvals where approval_id = $1', [s.approval]);
+      assert.equal(st.rows[0].status, 'pending');
+      assert.equal((await decide('api_property_manager', { org: ORG1, user: 'u', actor: 'human' }, s.approval, 'approved')).rowCount, 1);
+    });
+
+    test('the writer has no access to ops tables other than the three inbox tables', async () => {
+      const r = await admin.query(
+        `select c.relname from pg_class c join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = 'ops' and c.relkind in ('r','v','m','p','f')
+           and c.relname not in ('agent_runs','agent_actions','approvals')
+           and (has_table_privilege('api_agent_writer', c.oid, 'SELECT') or has_table_privilege('api_agent_writer', c.oid, 'INSERT')
+                or has_table_privilege('api_agent_writer', c.oid, 'UPDATE') or has_table_privilege('api_agent_writer', c.oid, 'DELETE'))`);
+      assert.deepEqual(r.rows, []);
+    });
+
+    test('the inbox list index exists and is used for the org/status/requested_at order', async () => {
+      const r = await admin.query("select indexname from pg_indexes where schemaname = 'ops' and tablename = 'approvals'");
+      const names = r.rows.map((x) => x.indexname);
+      assert.ok(names.includes('approvals_org_status_requested_idx') && names.includes('approvals_org_requested_idx'), names.join(','));
+      assert.ok(!names.includes('approvals_org_status_idx'));
     });
 
     test('an agent identity (app.actor = agent) cannot decide, whatever its role', async () => {

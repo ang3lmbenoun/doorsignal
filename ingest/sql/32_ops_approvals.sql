@@ -5,6 +5,11 @@
 --   agent_actions  what the agent produced; UPDATE and DELETE are refused by triggers
 --   approvals      one pending row per T2 draft; only a human can move it to approved/rejected
 
+create schema if not exists ops;
+
+-- NOTE: `create table if not exists` creates tables but never alters existing ones. A later change to a column,
+-- CHECK or key needs its own idempotent `alter table` step in this file; until then it only reaches new databases.
+
 create table if not exists ops.agent_runs (
     run_id      uuid primary key,
     org_id      text not null,
@@ -64,7 +69,12 @@ create table if not exists ops.approvals (
     -- Same org as the action, and the action must be a T2 draft (tier is part of the key).
     foreign key (action_id, org_id, tier) references ops.agent_actions (action_id, org_id, tier)
 );
-create index if not exists approvals_org_status_idx on ops.approvals (org_id, status);
+-- The inbox list is: where org_id = ? [and status = ?] order by requested_at desc, approval_id. These serve it
+-- without sorting the whole org (the tables only grow). The earlier (org_id, status) index is superseded.
+create index if not exists approvals_org_status_requested_idx
+    on ops.approvals (org_id, status, requested_at desc, approval_id);
+create index if not exists approvals_org_requested_idx on ops.approvals (org_id, requested_at desc, approval_id);
+drop index if exists ops.approvals_org_status_idx;
 
 -- UPDATE and DELETE on agent_runs and agent_actions are refused for every role by row triggers. This is not
 -- owner-proof: the table owner could drop or disable a trigger. TRUNCATE is not covered by these triggers; no
@@ -103,16 +113,20 @@ begin
     if tg_op = 'DELETE' then
         raise exception 'approvals are never deleted' using errcode = '42501';
     end if;
-    -- A token minted for the triage agent (claim actor = 'agent', sent as app.actor) can read as a
-    -- maintenance_coordinator but can never decide an approval, so the agent cannot approve its own drafts.
-    if coalesce(current_setting('app.actor', true), '') = 'agent' then
-        raise exception 'an agent identity cannot decide approvals' using errcode = '42501';
-    end if;
     if old.status <> 'pending' then
         raise exception 'approval already decided' using errcode = '23514';
     end if;
     if new.status not in ('approved', 'rejected') then
         raise exception 'an approval can only move to approved or rejected' using errcode = '23514';
+    end if;
+    -- Fail closed: only an explicit human identity (app.actor = 'human', set by the API for every non-agent
+    -- token) can decide. A missing, unknown or 'agent' value cannot, so the triage agent can read as a
+    -- maintenance_coordinator but never approve its own drafts.
+    if coalesce(current_setting('app.actor', true), '') <> 'human' then
+        raise exception 'only a human identity can decide approvals' using errcode = '42501';
+    end if;
+    if uid ~* '^agent\.' then
+        raise exception 'agent identities cannot decide approvals' using errcode = '42501';
     end if;
     if uid is null then
         raise exception 'approver identity (app.user_id) is missing' using errcode = '42501';

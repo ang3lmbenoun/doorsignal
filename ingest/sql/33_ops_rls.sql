@@ -38,6 +38,17 @@ begin
     end loop;
 end $$;
 
+-- The writer may use schema ops only for the three inbox tables: close every other ops table to it explicitly
+-- (pipeline logs such as ops.load_log), so its isolation does not depend on nothing ever being granted there.
+do $$
+declare t record;
+begin
+    for t in select tablename from pg_tables
+             where schemaname = 'ops' and tablename not in ('agent_runs', 'agent_actions', 'approvals') loop
+        execute format('revoke all on ops.%I from api_agent_writer', t.tablename);
+    end loop;
+end $$;
+
 grant usage on schema ops to api_agent_writer, api_property_manager, api_maintenance_coordinator;
 
 alter table ops.agent_runs enable row level security;
@@ -73,11 +84,14 @@ create policy w_approvals on ops.approvals for insert to api_agent_writer
 
 -- Human approvers: read their org's inbox; decide pending rows of their org.
 create policy h_runs on ops.agent_runs for select to api_property_manager, api_maintenance_coordinator
-    using (org_id = nullif(current_setting('app.org_id', true), ''));
+    using (org_id = nullif(current_setting('app.org_id', true), '')
+         and coalesce(current_setting('app.actor', true), '') <> 'agent');
 create policy h_actions on ops.agent_actions for select to api_property_manager, api_maintenance_coordinator
-    using (org_id = nullif(current_setting('app.org_id', true), ''));
+    using (org_id = nullif(current_setting('app.org_id', true), '')
+         and coalesce(current_setting('app.actor', true), '') <> 'agent');
 create policy h_approvals_read on ops.approvals for select to api_property_manager, api_maintenance_coordinator
-    using (org_id = nullif(current_setting('app.org_id', true), ''));
+    using (org_id = nullif(current_setting('app.org_id', true), '')
+         and coalesce(current_setting('app.actor', true), '') <> 'agent');
 create policy h_approvals_decide on ops.approvals for update to api_property_manager, api_maintenance_coordinator
     using (org_id = nullif(current_setting('app.org_id', true), '') and status = 'pending')
     with check (org_id = nullif(current_setting('app.org_id', true), '') and status in ('approved', 'rejected'));
