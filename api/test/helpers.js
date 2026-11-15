@@ -39,6 +39,18 @@ export function adminClientConfig() {
   return { connectionString: u.toString() };
 }
 
+// Direct connection URL for the agent's own database role (never the pooled host).
+export function agentUrlFromAdmin() {
+  const password = process.env.AGENT_WRITER_PASSWORD || '';
+  if (password.length < 24) throw new Error('AGENT_WRITER_PASSWORD is not set (or too short)');
+  const u = new URL(ADMIN_URL);
+  const out = new URL(`postgresql://${u.host.replace('-pooler', '')}${u.pathname}`);
+  out.username = 'api_agent_writer';
+  out.password = password;
+  out.searchParams.set('sslmode', 'require');
+  return out.toString();
+}
+
 export const adminUser = () => decodeURIComponent(new URL(ADMIN_URL).username);
 
 export const SECRET = crypto.randomBytes(32).toString('hex');

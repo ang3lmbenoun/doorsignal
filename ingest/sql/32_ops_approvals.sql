@@ -2,7 +2,7 @@
 -- Run by the owner role. Not managed by dbt, so dbt rebuilds never touch these tables.
 -- Nothing here sends anything: "approved" is a status, nothing more.
 --   agent_runs     one row per triage run (written once, never updated)
---   agent_actions  what the agent produced; append-only (triggers refuse UPDATE and DELETE)
+--   agent_actions  what the agent produced; UPDATE and DELETE are refused by triggers
 --   approvals      one pending row per T2 draft; only a human can move it to approved/rejected
 
 create table if not exists ops.agent_runs (
@@ -30,8 +30,9 @@ create table if not exists ops.agent_actions (
     entity_id    text not null,
     payload      jsonb not null,
     draft_text   text check (draft_text is null or length(draft_text) between 1 and 2000),
-    -- The hash is computed by the database from the stored text; the writer cannot supply or forge it.
-    draft_sha256 text generated always as (encode(sha256(convert_to(draft_text, 'UTF8')), 'hex')) stored,
+    -- Set by the ops.set_draft_hash trigger from the stored text; whatever the caller supplies is overwritten.
+    -- (Not a generated column: convert_to() is STABLE, and generation expressions must be immutable.)
+    draft_sha256 text,
     created_at   timestamptz not null default now(),
     -- A draft exists exactly for T2; T1 flags and T2 drafts use disjoint kinds.
     check ((tier = 'T2') = (draft_text is not null)),
@@ -65,7 +66,9 @@ create table if not exists ops.approvals (
 );
 create index if not exists approvals_org_status_idx on ops.approvals (org_id, status);
 
--- agent_runs and agent_actions are append-only for every role, the owner included.
+-- UPDATE and DELETE on agent_runs and agent_actions are refused for every role by row triggers. This is not
+-- owner-proof: the table owner could drop or disable a trigger. TRUNCATE is not covered by these triggers; no
+-- API role holds the privilege, so it is owner-only (used for test resets).
 create or replace function ops.refuse_change() returns trigger language plpgsql as $$
 begin
     raise exception '% on ops.% is not allowed (append-only)', tg_op, tg_table_name using errcode = '42501';
@@ -73,6 +76,19 @@ end $$;
 drop trigger if exists agent_runs_append_only on ops.agent_runs;
 create trigger agent_runs_append_only before update or delete on ops.agent_runs
     for each row execute function ops.refuse_change();
+-- The draft hash is always computed here, from the stored text, and overwrites anything the caller supplied.
+create or replace function ops.set_draft_hash() returns trigger language plpgsql as $$
+begin
+    if new.draft_text is null then
+        new.draft_sha256 := null;
+    else
+        new.draft_sha256 := encode(sha256(convert_to(new.draft_text, 'UTF8')), 'hex');
+    end if;
+    return new;
+end $$;
+drop trigger if exists agent_actions_set_hash on ops.agent_actions;
+create trigger agent_actions_set_hash before insert on ops.agent_actions
+    for each row execute function ops.set_draft_hash();
 drop trigger if exists agent_actions_append_only on ops.agent_actions;
 create trigger agent_actions_append_only before update or delete on ops.agent_actions
     for each row execute function ops.refuse_change();
