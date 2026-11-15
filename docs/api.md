@@ -116,3 +116,15 @@ Exact allowed row set per role and org for every endpoint (the access rules live
 Also asserted: every schema except `serving` is closed to every API role (enumerated from `pg_namespace`), JWT issuer/audience/max-age, the offset cap and `/ready`.
 
 First run on the branch found one real leak, fixed before the pass above: S12 row-drift rows for `ground_truth.*` tables (names and row counts) were served to data_owner.
+
+## Policy-mutation check for the approval inbox (M5b, incomplete)
+Run on the Neon branch `m5a-rls-test` only, with the DB-backed tests (leaks, approvals-db, approvals-api, agent e2e: 285 tests). Each mutation is applied, the tests run, and `30`-`33` re-applied with the restored state compared against a snapshot of policies, grants, column grants, schema usage, memberships and triggers. **Only 3 of the 10 planned mutations ran.** The branch owner password was rejected during the run (the cause is unknown; mutation 10 hung), so mutations 10 to 16 were not run and the branch could not be restored afterwards.
+
+| # | Mutation | Cases failed | Caught |
+|---|---|---|---|
+| 7 | `api_agent_writer` gets UPDATE on `ops.approvals` | 2 | yes ("cannot UPDATE approvals (self-approve)", "exactly INSERT on the three inbox tables") |
+| 8 | approver read policy on approvals: org filter replaced by `true` | 6 | yes (inbox shown across orgs; cross-org decide returns 200 not 404) |
+| 9 | approver decide policy: org filter removed | 0 | **no, and no observable change**: an UPDATE also needs the SELECT policy `h_approvals_read` (still org-filtered) and the approvals trigger reads the action through the org-filtered `h_actions`, so the decide policy's org filter is a redundant layer. Not a leak, and not testable without also removing those layers |
+| 10 to 16 | leasing_manager SELECT on approvals; trigger dropped; writer insert policy loosened; writer INSERT on `serving.leases`; actions org check removed; actions append-only trigger dropped; data_owner SELECT on actions | not run | - |
+
+Mutations 10 to 16 must be run before this table can be called complete. Mutation 10 (a bare SELECT grant on `ops.approvals` for leasing_manager) may turn out to be unobservable like 9, because that role has no USAGE on schema `ops`; I have not checked.
