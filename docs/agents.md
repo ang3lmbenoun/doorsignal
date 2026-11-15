@@ -71,3 +71,8 @@ Limits that matter more than the ranking:
 - **The model adds nothing to flag accuracy.** The deterministic rules also score 100% on these cases, because flags follow directly from signal values. A model is only worth its latency, cost and risk if it improves draft wording, and **draft quality is not measured here** (drafts are only checked for safety: no links, contact details, legal wording or foreign ids). Treat the rules path as the reliable baseline and the model as optional.
 - 36 cases, one run each, temperature 0, free-tier shared endpoints: a difference of one or two cases (the lightning and muse misses) is within what repeated runs could change. Injection results are 8 cases, not a proof of robustness; the real protection is the validator and the tier design, which the fake-model tests exercise independently.
 - The 550B model's cost and licensing for production use are unknown to me and not evaluated. The two Llama and gpt-oss candidates you asked for were not testable, so nothing here says how they compare.
+
+## Live agent runs on `m5b-verify`
+Both runs: org ORG1, API on loopback, token minted separately, writer role `api_agent_writer`, `LLM_DATA_CLASS=synthetic` (loaded by the cli allowlist).
+- `--rules-only`: path = rules, status `ok`, 6 cases, 9 flags, 8 drafts, exit 0. No provider contacted.
+- With provider (`nvidia/nemotron-3-ultra-550b-a55b`): the provider answered, the closed validator rejected the answer (`reason:forbidden:markup`), the rules produced the same 9 flags and 8 drafts, run status `rejected_output`, exit 3. So the model path is reachable but did not produce an accepted answer in this single run; one run is not a rate.
