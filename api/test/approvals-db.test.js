@@ -186,6 +186,54 @@ async function run() {
       await fails(asWriter(ORG1, (c) => c.query("insert into ops.approvals (approval_id, action_id, org_id, status, decided_by) values ($1,$2,$3,'pending','me')", [uuid(), f2, ORG1])), ['23514']);
     });
 
+    // Mutation 12 survived the test above: an "approved" row without decision fields is also stopped by CHECK
+    // constraints, so that test cannot tell the RLS check from the CHECKs. A row that satisfies every CHECK
+    // (status approved, all decision fields set) is stopped by the writer's insert policy alone, so this test
+    // must see 42501 (RLS), never 23514 (CHECK) or success.
+    test('cannot insert an already-decided approval with every decision field forged (RLS is the only barrier)', async () => {
+      const s = await seed(ORG1);
+      for (const status of ['approved', 'rejected']) {
+        const action = uuid();
+        await asWriter(ORG1, (c) => c.query(
+          `insert into ops.agent_actions (action_id, run_id, org_id, tier, kind, entity_type, entity_id, payload, draft_text)
+           values ($1,$2,$3,'T2',$4,'work_order','WO5','{}','forged-target')`, [action, s.run, ORG1, T2_KIND]));
+        const approval = uuid();
+        await fails(
+          asWriter(ORG1, (c) => c.query(
+            `insert into ops.approvals (approval_id, action_id, org_id, status, decided_by, decided_role, decided_at,
+                                        draft_text_at_decision, draft_sha256)
+             values ($1,$2,$3,$4,'forged-human','property_manager', now(), 'forged-target', $5)`,
+            [approval, action, ORG1, status, sha('forged-target')])),
+          ['42501'],
+          `forged ${status} approval must be refused by the insert policy`);
+        const n = await admin.query('select count(*)::int as n from ops.approvals where approval_id = $1', [approval]);
+        assert.equal(n.rows[0].n, 0);
+      }
+    });
+
+    // Mutation 14 survived: the org check on agent_actions inserts was never tested (only agent_runs was). The
+    // action must reference a real run of the other org, so the (run_id, org_id) foreign key is satisfied and
+    // only the writer's insert policy stands in the way.
+    test('cannot insert an action into another org (run of that org exists), nor an approval for its action', async () => {
+      const run2 = uuid(); const action2 = uuid(); const foreignAction = uuid();
+      await admin.query("insert into ops.agent_runs (run_id, org_id, mode, status) values ($1,$2,'rules','ok')", [run2, ORG2]);
+      await admin.query(
+        `insert into ops.agent_actions (action_id, run_id, org_id, tier, kind, entity_type, entity_id, payload, draft_text)
+         values ($1,$2,$3,'T2',$4,'work_order','WO6','{}','org2 draft')`, [action2, run2, ORG2, T2_KIND]);
+      // writer is acting as ORG1; every row below belongs to ORG2
+      await fails(asWriter(ORG1, (c) => c.query(
+        `insert into ops.agent_actions (action_id, run_id, org_id, tier, kind, entity_type, entity_id, payload)
+         values ($1,$2,$3,'T1','repair_at_risk','work_order','WO6','{}')`, [foreignAction, run2, ORG2])), ['42501'],
+      'agent_actions insert for another org must be refused by the insert policy');
+      await fails(asWriter(ORG1, (c) => c.query(
+        "insert into ops.approvals (approval_id, action_id, org_id, status) values ($1,$2,$3,'pending')",
+        [uuid(), action2, ORG2])), ['42501'], 'approvals insert for another org must be refused by the insert policy');
+      const n = await admin.query(
+        'select (select count(*) from ops.agent_actions where action_id = $1)::int as a, (select count(*) from ops.approvals where action_id = $2)::int as p',
+        [foreignAction, action2]);
+      assert.deepEqual(n.rows[0], { a: 0, p: 0 });
+    });
+
     test('cannot write into another org, or with no org set', async () => {
       const run = uuid();
       const ins = (c) => c.query("insert into ops.agent_runs (run_id, org_id, mode, status) values ($1,$2,'rules','ok')", [run, ORG2]);
