@@ -4,6 +4,7 @@ import { REQUIRED_CLAIMS, ROLES } from './roles.js';
 export const ISSUER = 'doorsignal';
 export const AUDIENCE = 'doorsignal-api';
 const ID = /^[A-Za-z0-9_-]{1,32}$/;
+const SUB = /^[A-Za-z0-9_.@-]{1,64}$/;
 
 // Verifies a bearer token (HS256 only, exp required) and returns clean claims, or null.
 export async function authenticate(header, secret) {
@@ -25,13 +26,22 @@ export async function authenticate(header, secret) {
   }
   const role = payload.role;
   if (typeof role !== 'string' || !Object.hasOwn(ROLES, role)) return null;
-  const claims = { role, org_id: '', owner_id: '' };
+  // actor: 'agent' marks a token minted for the triage agent. Anything else present is refused.
+  if (payload.actor !== undefined && payload.actor !== 'agent') return null;
+  const claims = { role, org_id: '', owner_id: '', sub: '', actor: payload.actor === 'agent' ? 'agent' : 'human' };
+  if (payload.sub !== undefined) {
+    if (typeof payload.sub !== 'string' || !SUB.test(payload.sub)) return null;
+    claims.sub = payload.sub;
+  }
   for (const name of ['org_id', 'owner_id']) {
     const v = payload[name];
     if (v === undefined) continue;
     if (typeof v !== 'string' || !ID.test(v)) return null;
     claims[name] = v;
   }
+  // `agent.*` subjects belong to the triage agent: a token naming one without actor = 'agent' is refused, so a
+  // token cannot pass as a human approver while carrying the agent's identity.
+  if (/^agent\./i.test(claims.sub) && claims.actor !== 'agent') return null;
   for (const name of REQUIRED_CLAIMS[role]) if (!claims[name]) return null;
   return claims;
 }

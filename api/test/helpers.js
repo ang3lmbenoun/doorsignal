@@ -16,7 +16,9 @@ export const ADMIN_URL = (process.env.NEON_TEST_DATABASE_URL || process.env.NEON
 
 export function guardNotMain() {
   const main = (process.env.DATABASE_URL || '').trim();
-  if (main && hostOf(main) === hostOf(ADMIN_URL)) {
+  const mainHost = (process.env.MAIN_DATABASE_HOST || '').trim().replace('-pooler', '') || (main ? hostOf(main) : '');
+  if (!mainHost && process.env.GITHUB_ACTIONS === 'true') throw new Error('main database host unknown (set MAIN_DATABASE_HOST)');
+  if (mainHost && mainHost === hostOf(ADMIN_URL)) {
     throw new Error('Refusing to run: the test database host equals DATABASE_URL (main). Use a Neon branch.');
   }
 }
@@ -37,6 +39,18 @@ export function adminClientConfig() {
   const u = new URL(ADMIN_URL);
   u.hostname = u.hostname.replace('-pooler', '');
   return { connectionString: u.toString() };
+}
+
+// Direct connection URL for the agent's own database role (never the pooled host).
+export function agentUrlFromAdmin() {
+  const password = process.env.AGENT_WRITER_PASSWORD || '';
+  if (password.length < 24) throw new Error('AGENT_WRITER_PASSWORD is not set (or too short)');
+  const u = new URL(ADMIN_URL);
+  const out = new URL(`postgresql://${u.host.replace('-pooler', '')}${u.pathname}`);
+  out.username = 'api_agent_writer';
+  out.password = password;
+  out.searchParams.set('sslmode', 'require');
+  return out.toString();
 }
 
 export const adminUser = () => decodeURIComponent(new URL(ADMIN_URL).username);

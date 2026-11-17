@@ -1,9 +1,10 @@
+import { fileURLToPath } from 'node:url';
 import { createApp } from './app.js';
 import { loadConfig } from './config.js';
 import { createPool } from './db.js';
 
 try {
-  process.loadEnvFile?.('../.env'); // optional gitignored .env at the repo root (Node 20.12+)
+  process.loadEnvFile?.(fileURLToPath(new URL('../../.env', import.meta.url))); // gitignored .env at the repo root
 } catch {
   /* no .env: rely on the process environment */
 }

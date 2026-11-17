@@ -1,22 +1,9 @@
 import express from 'express';
 import { authenticate } from './auth.js';
 import { withClaims } from './db.js';
+import { approvalsRouter } from './approvals.js';
 import { ENDPOINTS } from './endpoints.js';
-
-const MAX_LIMIT = 500;
-const MAX_OFFSET = 100000;
-
-function parsePaging(query) {
-  const out = { limit: 100, offset: 0 };
-  for (const key of ['limit', 'offset']) {
-    if (query[key] === undefined) continue;
-    const v = query[key];
-    if (typeof v !== 'string' || !/^\d{1,7}$/.test(v)) return null;
-    out[key] = Number.parseInt(v, 10);
-  }
-  if (out.limit < 1 || out.limit > MAX_LIMIT || out.offset > MAX_OFFSET) return null;
-  return out;
-}
+import { parsePaging, reply } from './util.js';
 
 // Builds WHERE parts from the endpoint's allowlisted filters. Values are bound, never concatenated.
 function buildFilters(endpoint, query, idValue) {
@@ -37,8 +24,6 @@ function buildFilters(endpoint, query, idValue) {
   }
   return { where, values };
 }
-
-const reply = (res, status, error) => res.status(status).json({ error });
 
 function makeHandler(endpoint, pool, byId) {
   return async (req, res, next) => {
@@ -80,10 +65,13 @@ export function createApp({ pool, jwtSecret }) {
   app.get('/health', (req, res) => res.json({ status: 'ok' }));
   // Readiness: can the API role actually read the serving layer? Fails (503) after a dbt rebuild that did not
   // re-apply grants, or when the database is unreachable. Returns no data.
+  let readyUntil = 0;
   app.get('/ready', async (req, res) => {
+    if (Date.now() < readyUntil) return res.json({ status: 'ready' });
     try {
       await withClaims(pool, { role: 'data_owner', org_id: '', owner_id: '' }, (c) =>
         c.query('SELECT 1 FROM serving.all_signals LIMIT 1'));
+      readyUntil = Date.now() + 5000;
       res.json({ status: 'ready' });
     } catch (err) {
       console.error('not ready', { code: err && err.code });
@@ -97,7 +85,9 @@ export function createApp({ pool, jwtSecret }) {
     req.claims = claims;
     return next();
   });
-  // Read-only API (tier T0): anything but GET/HEAD is refused after authentication.
+  // The approval inbox is the only place a write is possible (a human's decision on a pending draft).
+  app.use('/v1/approvals', approvalsRouter(pool));
+  // Everything else is read-only (tier T0): anything but GET/HEAD is refused after authentication.
   app.use('/v1', (req, res, next) => {
     if (req.method === 'GET' || req.method === 'HEAD') return next();
     return reply(res.set('Allow', 'GET'), 405, 'method not allowed');
