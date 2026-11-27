@@ -64,6 +64,18 @@ export function scanText(text, allowedIds) {
   return null;
 }
 
+// Names the characters behind a rejection WITHOUT quoting any model text: only fixed class labels are returned.
+// Used for the rejection log (agent_runs.rejections), so a later reader can see which rule fired on which field.
+export function charClasses(text, code) {
+  if (code !== 'forbidden:markup') return [];
+  const out = [];
+  if (text.includes('<')) out.push('lt');
+  if (text.includes('>')) out.push('gt');
+  if (text.includes('`')) out.push('backtick');
+  if (text.includes('](')) out.push('md_link');
+  return out;
+}
+
 // Accepts a bare JSON object, or exactly one fenced block containing it. Nothing else.
 export function extractJson(text) {
   if (typeof text !== 'string') return null;
@@ -104,7 +116,7 @@ export function validateOutput(text, cases) {
     if (!FLAG_KINDS.includes(f.kind)) return { ok: false, code: 'unknown_flag_kind' };
     if (typeof f.reason !== 'string' || f.reason.length < 1 || f.reason.length > MAX_REASON) return { ok: false, code: 'bad_reason' };
     const bad = scanText(f.reason, allowedIds);
-    if (bad) return { ok: false, code: `reason:${bad}` };
+    if (bad) return { ok: false, code: `reason:${bad}`, detail: { field: `flags[${obj.flags.indexOf(f)}].reason`, rule: bad, classes: charClasses(f.reason, bad), length: f.reason.length } };
     const key = `${f.work_order_id}|${f.kind}`;
     if (seen.has(key)) continue; // a repeated flag is harmless: keep the first
     seen.add(key);
@@ -118,7 +130,7 @@ export function validateOutput(text, cases) {
     if (!DRAFT_KINDS.includes(d.kind)) return { ok: false, code: 'unknown_draft_kind' };
     if (typeof d.text !== 'string' || d.text.trim().length < 1 || d.text.length > MAX_TEXT) return { ok: false, code: 'bad_text' };
     const bad = scanText(d.text, allowedIds);
-    if (bad) return { ok: false, code: `draft:${bad}` };
+    if (bad) return { ok: false, code: `draft:${bad}`, detail: { field: `drafts[${obj.drafts.indexOf(d)}].text`, rule: bad, classes: charClasses(d.text, bad), length: d.text.length } };
     const key = `${d.work_order_id}|${d.kind}`;
     if (seenDraft.has(key)) continue;
     seenDraft.add(key);

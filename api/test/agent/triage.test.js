@@ -238,3 +238,29 @@ describe('run records: why a run fell back, how many batches were rejected, and 
     assert.ok(logs.includes('triage found no cases to look at'));
   });
 });
+
+describe('rejection log and prompt (M5c)', () => {
+  const cases = [mk('W000001', { s01: s01(7.4) })];
+  const providers = [{ name: 'p', model: 'm', baseUrl: 'https://x.invalid', apiKey: 'k' }];
+  const bad = json([{ work_order_id: 'W000001', kind: 'repair_breach_presumed', reason: 'S01 >= 7' }]);
+
+  test('a rejected batch is recorded with batch number, rule, field, character class and hash, but no text', async () => {
+    const r = await triageCases({ cases, providers, completeFn: async () => ({ text: bad, provider: 'p', model: 'm' }), log: () => {} });
+    assert.equal(r.rejections.length, 1);
+    const [x] = r.rejections;
+    assert.deepEqual([x.batch, x.code, x.field, x.rule, x.classes], [1, 'reason:forbidden:markup', 'flags[0].reason', 'forbidden:markup', ['gt']]);
+    assert.match(x.sha8, /^[0-9a-f]{8}$/);
+    assert.ok(!JSON.stringify(r.rejections).includes('S01'));
+  });
+  test('a clean run has an empty log', async () => {
+    const r = await triageCases({ cases, providers: [], rulesOnly: true, log: () => {} });
+    assert.deepEqual(r.rejections, []);
+  });
+  test('the prompt tells the model not to write < > or backticks and no longer contains them itself in its rules', () => {
+    const { content } = messagesFor(cases)[0];
+    assert.match(content, /Never use the characters < > or a backtick/);
+    const rules = content.slice(content.indexOf('Rules:'));
+    const stripped = rules.replace('Never use the characters < > or a backtick', '').replace(/<cases>/g, '');
+    assert.ok(!/[<>`]/.test(stripped), 'rules text must not teach the model the forbidden characters');
+  });
+});
