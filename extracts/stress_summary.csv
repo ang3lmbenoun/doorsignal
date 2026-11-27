@@ -1,0 +1,31 @@
+org_id,owner_id,scenario_id,description,n_leases,el_nonrenewal,el_delinquency,el_total,delta_vs_base,pct_vs_base,evidence_grade,lineage_ref,computed_at
+ORG2,O06,base,No stress,10,6887.18,177.51,7064.69,0.00,0.0,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG2,O05,base,No stress,34,39789.11,600.40,40389.52,0.00,0.0,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG2,O04,base,No stress,45,44515.79,627.77,45143.56,0.00,0.0,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG1,O03,base,No stress,82,107244.61,1361.17,108605.77,0.00,0.0,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG1,O02,base,No stress,83,75528.50,1375.47,76903.98,0.00,0.0,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG1,O01,base,No stress,23,29597.00,401.58,29998.57,0.00,0.0,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG2,O06,vacancy_up_3pt,Vacancy rate up 3 points: about 11 more vacant days per turnover (0.03 x 365),10,7583.52,177.51,7761.03,696.34,9.9,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG2,O05,vacancy_up_3pt,Vacancy rate up 3 points: about 11 more vacant days per turnover (0.03 x 365),34,43900.17,600.40,44500.57,4111.05,10.2,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG2,O04,vacancy_up_3pt,Vacancy rate up 3 points: about 11 more vacant days per turnover (0.03 x 365),45,48881.79,627.77,49509.56,4366.00,9.7,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG1,O03,vacancy_up_3pt,Vacancy rate up 3 points: about 11 more vacant days per turnover (0.03 x 365),82,117684.43,1361.17,119045.60,10439.82,9.6,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG1,O02,vacancy_up_3pt,Vacancy rate up 3 points: about 11 more vacant days per turnover (0.03 x 365),83,83001.42,1375.47,84376.89,7472.91,9.7,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG1,O01,vacancy_up_3pt,Vacancy rate up 3 points: about 11 more vacant days per turnover (0.03 x 365),23,32453.76,401.58,32855.34,2856.76,9.5,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG2,O06,repair_time_up_25,Repair and assignment times 25 percent slower,10,7028.16,177.51,7205.67,140.98,2.0,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG2,O05,repair_time_up_25,Repair and assignment times 25 percent slower,34,40592.66,600.40,41193.06,803.54,2.0,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG2,O04,repair_time_up_25,Repair and assignment times 25 percent slower,45,46026.54,627.77,46654.31,1510.75,3.3,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG1,O03,repair_time_up_25,Repair and assignment times 25 percent slower,82,110081.18,1361.17,111442.34,2836.57,2.6,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG1,O02,repair_time_up_25,Repair and assignment times 25 percent slower,83,78011.21,1375.47,79386.68,2482.70,3.2,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG1,O01,repair_time_up_25,Repair and assignment times 25 percent slower,23,30327.70,401.58,30729.27,730.70,2.4,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG2,O06,delinquency_up_50,Delinquency probability 50 percent higher,10,6887.18,264.09,7151.26,86.58,1.2,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG2,O05,delinquency_up_50,Delinquency probability 50 percent higher,34,39789.11,894.02,40683.14,293.62,0.7,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG2,O04,delinquency_up_50,Delinquency probability 50 percent higher,45,44515.79,939.67,45455.46,311.90,0.7,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG1,O03,delinquency_up_50,Delinquency probability 50 percent higher,82,107244.61,2026.74,109271.34,665.57,0.6,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG1,O02,delinquency_up_50,Delinquency probability 50 percent higher,83,75528.50,2049.35,77577.86,673.88,0.9,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG1,O01,delinquency_up_50,Delinquency probability 50 percent higher,23,29597.00,594.87,30191.87,193.30,0.6,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG2,O06,combined,All three stresses together,10,7736.86,264.09,8000.94,936.26,13.3,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG2,O05,combined,All three stresses together,34,44792.26,894.02,45686.29,5296.77,13.1,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG2,O04,combined,All three stresses together,45,50544.23,939.67,51483.90,6340.34,14.0,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG1,O03,combined,All three stresses together,82,120804.58,2026.74,122831.31,14225.54,13.1,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG1,O02,combined,All three stresses together,83,85731.29,2049.35,87780.64,10876.66,14.1,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00
+ORG1,O01,combined,All three stresses together,23,33257.27,594.87,33852.14,3853.57,12.8,C,risk.stress_results (scenario knobs are assumptions) -> serving.stress_summary,2026-11-01 00:00:00

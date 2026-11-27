@@ -4,6 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from audit.harness import AuditConfig
+from audit.narrate import narrate
 from audit.scenarios import run_scenario
 
 SEEDS = [1, 2, 3, 4, 5, 6]
@@ -25,6 +26,7 @@ def main() -> int:
                 n_flags += r.flagged
                 lines.append(f"| {seed} | {r.outcome} | {r.stat_ref:.3f} | {r.stat_cmp:.3f} | {r.effect:.3f} | {r.p_holm:.4f} | {'YES' if r.flagged else 'no'} |")
         lines += ["", f"Flags across {len(SEEDS)} seeds: **{n_flags}**", ""]
+        lines += [f"Narration, seed {SEEDS[0]}:", "", "```", narrate(run_scenario(SEEDS[0], planted_delay_factor=factor, cfg=cfg)), "```", ""]
     lines += ["Reading: effect is Cohen's d for continuous outcomes and the G2/G1 rate ratio for binary ones. A flag is a prompt for human review, not a finding of discrimination."]
     OUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
     print(f"wrote {OUT}")
