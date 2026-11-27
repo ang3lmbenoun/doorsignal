@@ -34,15 +34,14 @@ export default function App() {
   return (
     <div className="shell">
       <aside>
-        <div className="brand"><Logo size={44} /><b>DoorSignal</b><small>Connect · Manage · Thrive</small></div>
+        <div className="brand"><Logo size={28} /><div className="bt"><b>DoorSignal</b><small>Connect · Manage · Thrive</small></div></div>
         <nav>{NAV.filter(([id]) => can(id)).map(([id, label]) => <a key={id} href={`#${id}`} className={id === current ? 'on' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={ICON[id]} /></svg>{label}</a>)}</nav>
         <div className="who">
           <img src="/img/avatar.jpg" alt="" />
-          <div className="wtext"><strong>{user.name}</strong><span>{user.title}</span></div>
-          <button className="link" onClick={() => logout().then(() => { setUser(null); window.location.hash = ''; })}>Sign out</button>
+          <div className="wtext"><strong>{user.name}</strong><span>{user.title}</span><button className="link" onClick={() => logout().then(() => { setUser(null); window.location.hash = ''; })} style={{ textAlign: 'left' }}>Sign out</button></div>
         </div>
       </aside>
-      <main key={`${user.id}-${current}`} className={current === 'campus' ? 'bleed' : ''}>
+      <main key={`${user.id}-${current}`} className={current === 'campus' ? 'ov-main' : ''}>
         {current === 'campus' ? null : <div className="banner">Demo: synthetic data only</div>}
         <View user={user} can={can} go={go} />
       </main>

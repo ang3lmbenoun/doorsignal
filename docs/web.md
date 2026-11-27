@@ -36,3 +36,6 @@ Same rules as the API (`docs/api.md`): the database decides. Pages a role cannot
 ## Look and feel (M9)
 
 The sign-in and the home (Overview) use an espresso and gold style. The home layout follows the "Good evening" design; the sign-in follows the DoorSignal login design. The photos in `web/client/public/img/` are cut from design images made outside this repo (an AI image tool). They are placeholders: replace them with sharp, licensed originals before any public use. Text, numbers and links on these screens are live; the four card photos carry their titles in the picture. The home figures come from the same signals and approvals as the other pages. The mock's occupancy, revenue and portfolio-property figures are not shown because the API has no such data yet. The Content-Security-Policy now allows Google Fonts (styles and font files only).
+
+## Compact redesign (M9b)
+Design source: Figma file "DoorSignal – Redesign (compact)" (variables for colour and spacing, text styles). Inter only. Scale: page title 20/28, section 14/20, body 13/20, small 12/16, caption 11/16, KPI number 22/28. Sidebar 232 px, nav rows 36 px, cards 12 px radius with 16 px padding, controls 32 px high. The Overview no longer carries photo cards or a hero; the sign-in page keeps the photo. Mobbin references were not used (the connector needs a paid plan).
