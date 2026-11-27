@@ -67,3 +67,15 @@ def test_binary_four_fifths_rule():
 def test_holm_is_monotone_and_bounded():
     adj = holm([0.01, 0.04, 0.03])
     assert adj == pytest.approx([0.03, 0.06, 0.06])
+
+
+def test_narration_reports_flags_and_numbers_without_legal_claims():
+    from audit.narrate import check_text, narrate
+
+    planted = narrate(run_scenario(2, planted_delay_factor=2.0, cfg=FAST))
+    assert "FLAGGED for human review" in planted and "repair requests waited" in planted
+    assert "standard deviations higher for G2" in planted
+    null = narrate(run_scenario(2, planted_delay_factor=None, cfg=FAST))
+    assert null.startswith("No outcome was flagged") and "FLAGGED" not in null
+    with pytest.raises(ValueError):
+        check_text("This proves discrimination.")

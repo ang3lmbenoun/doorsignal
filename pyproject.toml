@@ -7,6 +7,7 @@ select = ["E", "F", "I", "B"]
 
 [tool.ruff.lint.per-file-ignores]
 "audit/*" = ["E501"]
+"ingest/export_extracts.py" = ["E501"]
 "tests/test_audit.py" = ["E501"]
 
 [tool.pytest.ini_options]

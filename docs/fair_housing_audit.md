@@ -34,6 +34,18 @@ Flag rule: at least 30 per group, effect at least |d| 0.20 (continuous) or outsi
 
 Flags across 6 seeds: **0**
 
+Narration, seed 1:
+
+```
+No outcome was flagged (4 tested).
+- how long repair requests waited for assignment in the first 90 days: 0.09 standard deviations higher for G2; adjusted p 0.722; no flag.
+- the predicted chance of not renewing (S04): 0.05 standard deviations higher for G2; adjusted p 0.955; no flag.
+- the share placed on the high renewal-risk shortlist: G2 at 10.8% against G1 at 9.5% (ratio 1.15); adjusted p 0.955; no flag.
+- the observed move-out rate: G2 at 55.5% against G1 at 54.6% (ratio 1.02); adjusted p 0.955; no flag.
+
+No flag does not rule out a disparity: groups this small can hide a modest gap.
+```
+
 ## Planted: G2 repair requests wait 2.0x longer for assignment
 
 | seed | outcome | G1 | G2 | effect | Holm p | flagged |
@@ -64,5 +76,17 @@ Flags across 6 seeds: **0**
 | 6 | moved_out | 0.564 | 0.514 | 0.911 | 0.3022 | no |
 
 Flags across 6 seeds: **6**
+
+Narration, seed 1:
+
+```
+1 of 4 outcomes were flagged for review.
+- how long repair requests waited for assignment in the first 90 days: 0.84 standard deviations higher for G2; adjusted p 0.001; FLAGGED for human review.
+- the predicted chance of not renewing (S04): 0.19 standard deviations higher for G2; adjusted p 0.003; no flag.
+- the share placed on the high renewal-risk shortlist: G2 at 11.7% against G1 at 8.9% (ratio 1.31); adjusted p 0.195; no flag.
+- the observed move-out rate: G2 at 55.5% against G1 at 54.6% (ratio 1.02); adjusted p 0.801; no flag.
+
+A flag means the gap is larger than chance and larger than the minimum effect size. It does not say why, and it is not a legal finding. Look at the inputs behind the flagged outcome before changing anything.
+```
 
 Reading: effect is Cohen's d for continuous outcomes and the G2/G1 rate ratio for binary ones. A flag is a prompt for human review, not a finding of discrimination.

@@ -2,7 +2,10 @@
 
 Status: **not built.** Tableau needs Tableau Desktop or Public on Angel's machine; it cannot be produced from the cloud workspace. This file is the specification so the build is mechanical.
 
-## Connection
+## Quickest path: the CSV extracts
+`extracts/` holds one CSV per serving table (see `extracts/MANIFEST.md`), built from a full warehouse run on the simulator seed. Rents there are **placeholders (assumption)** because the HUD file is not available to the cloud workspace; regenerate with real rents on your machine: `python -m ingest.run_dbt build` against Neon, then `python -m ingest.export_extracts`. In Tableau Public use Connect > Text file and follow the sheet table below, using the table names in place of `serving_*`. This resolves the open decision below with option (b).
+
+## Connection (live Postgres, optional)
 - Postgres connector to the Neon **direct** host, database `neondb`, schema `serving`, using a read-only login created for Tableau. Do not use the API roles and never main's owner login. Creating that login needs a decision (see "Open decision").
 - Tag the workbook source: `SYNTHETIC_CALIBRATED` (rents `REAL_PUBLIC`).
 

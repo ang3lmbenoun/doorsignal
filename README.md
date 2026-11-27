@@ -37,4 +37,5 @@ Milestones and what each proved: `docs/milestones.md`. Honest caveats:
 - Synthetic data means results show the machinery works, not how a real portfolio behaves.
 - No live model answer has yet passed the agent's output validator; the rules-based triage is the fallback and matches the best model on flags. Draft quality is unmeasured.
 - The Dallas eviction-filing data undercounts for 2022-2024; filings are not displacements.
-- Dashboards: see `docs/tableau.md`.
+- Dashboards: `extracts/` has Tableau-ready CSVs and `docs/tableau.md` the build spec; the workbook is not built yet.
+- Fair-housing audit: `python -m audit.run` (report in `docs/fair_housing_audit.md`).
