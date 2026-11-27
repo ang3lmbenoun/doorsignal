@@ -196,3 +196,26 @@ describe('bypass attempts found in the security review', () => {
     assert.equal(validateOutput(big, [W('W000001', 7)]).code, 'too_large');
   });
 });
+
+describe('rejection detail (M5c): which rule fired on which field, never the content', () => {
+  const cases = [W('W000001', 7.4)];
+  test('a flag reason with ">=" reports the field path and the character class, and not the text', () => {
+    const reason = 'S01 >= 7 days';
+    const r = validateOutput(json([flag('W000001', 'repair_breach_presumed', reason)]), cases);
+    assert.equal(r.ok, false);
+    assert.equal(r.code, 'reason:forbidden:markup');
+    assert.deepEqual(r.detail, { field: 'flags[0].reason', rule: 'forbidden:markup', classes: ['gt'], length: reason.length });
+    assert.ok(!JSON.stringify(r).includes('S01'));
+  });
+  test('a draft with a backtick and a "<" lists both classes and the draft index', () => {
+    const r = validateOutput(json([], [draft('W000001', 'tenant_status_message', 'Hello `x` 5 < 7'), draft('W000001', 'vendor_reassignment_suggestion', 'b')]), cases);
+    assert.equal(r.detail.field, 'drafts[0].text');
+    assert.deepEqual(r.detail.classes, ['lt', 'backtick']);
+  });
+  test('a markdown link is reported as md_link; other rules report no classes', () => {
+    assert.deepEqual(validateOutput(json([flag('W000001', 'repair_at_risk', 'see [a](b)')]), cases).detail.classes, ['md_link']);
+    const url = validateOutput(json([flag('W000001', 'repair_at_risk', 'see http://x.example')]), cases);
+    assert.deepEqual([url.code, url.detail.classes], ['reason:forbidden:url', []]);
+  });
+  test('structural rejections have no detail', () => assert.equal(validateOutput('not json', cases).detail, undefined));
+});

@@ -33,6 +33,7 @@ export async function triageCases({
   const flags = [];
   const drafts = [];
   const codes = [];
+  const rejections = []; // {batch, code, field, rule, classes, length}: which rule fired on which field, never content
   let usedLlm = false; let rejected = false; let unavailable = false;
   let provider = null; let model = null;
   const t0 = now();
@@ -92,6 +93,7 @@ export async function triageCases({
       rejected = true;
       counts.rejected += 1;
       codes.push(`${v.code}#${sha8(out.text)}`);
+      if (rejections.length < 20) rejections.push({ batch: n, code: v.code, sha8: sha8(out.text), ...(v.detail || {}) });
       log('agent output rejected', { code: v.code, provider: out.provider, model: out.model });
       useRules(batch);
       continue;
@@ -110,7 +112,7 @@ export async function triageCases({
   if (codes.length) {
     errorCode = `${codes.join(';')};batches=${counts.batches};llm=${counts.llm};rejected=${counts.rejected};rules=${counts.rules}`.slice(0, 400);
   }
-  return { mode, status, provider, model, errorCode, flags, drafts, counts };
+  return { mode, status, provider, model, errorCode, rejections, flags, drafts, counts };
 }
 
 // Turns a triage result into inbox rows: flags are T1, drafts are T2 (each gets a pending approval in the writer).
@@ -147,15 +149,15 @@ export async function runTriage({
     if (stats && stats.truncated) log('case list truncated', stats);
     const result = await triageCases({ cases, providers, rulesOnly, log, ...rest });
     const actions = buildActions(result, cases);
-    const { runId } = await writer.write({
+    const { runId, nDuplicatesSkipped } = await writer.write({
       run: {
         org, mode: result.mode, provider: result.provider, model: result.model, status: result.status,
-        errorCode: result.errorCode, startedAt, finishedAt: now(),
+        errorCode: result.errorCode, rejections: result.rejections, startedAt, finishedAt: now(),
       },
       actions,
     });
     return {
-      runId, mode: result.mode, status: result.status, cases: cases.length, candidates: stats ? stats.candidates : null,
+      runId, nDuplicatesSkipped, rejections: result.rejections.length, mode: result.mode, status: result.status, cases: cases.length, candidates: stats ? stats.candidates : null,
       truncated: stats ? stats.truncated : null, flags: result.flags.length, drafts: result.drafts.length, batches: result.counts,
     };
   } catch (e) {

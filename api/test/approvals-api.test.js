@@ -46,7 +46,7 @@ async function run() {
       await c.query("insert into ops.agent_runs (run_id, org_id, mode, status, n_drafts) values ($1,$2,'rules','ok',1)", [ids.run, org]);
       await c.query(
         `insert into ops.agent_actions (action_id, run_id, org_id, tier, kind, entity_type, entity_id, payload, draft_text)
-         values ($1,$2,$3,'T2','tenant_status_message','work_order','WO1','{}',$4)`, [ids.t2, ids.run, org, t]);
+         values ($1,$2,$3,'T2','tenant_status_message','work_order','WO-' || substr(md5(random()::text), 1, 12),'{}',$4)`, [ids.t2, ids.run, org, t]);
       await c.query("insert into ops.approvals (approval_id, action_id, org_id, status) values ($1,$2,$3,'pending')", [ids.approval, ids.t2, org]);
       await c.query('COMMIT');
     } finally {

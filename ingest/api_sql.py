@@ -20,7 +20,7 @@ from ingest.db import ROOT, ConfigError
 
 SQL_DIR = ROOT / "ingest" / "sql"
 FILES = {"roles": "30_api_roles.sql", "rls": "31_serving_rls.sql"}
-OPS_FILES = ["32_ops_approvals.sql", "33_ops_rls.sql"]
+OPS_FILES = ["32_ops_approvals.sql", "33_ops_rls.sql", "34_ops_hardening.sql"]
 PASSWORD_ENV = {"api_login": "API_LOGIN_PASSWORD", "api_agent_writer": "AGENT_WRITER_PASSWORD"}
 
 

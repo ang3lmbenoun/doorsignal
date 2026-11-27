@@ -4,6 +4,7 @@
 import assert from 'node:assert/strict';
 import crypto from 'node:crypto';
 import { after, describe, test } from 'node:test';
+import { createWriter } from '../agent/writer.js';
 import { ADMIN_URL, adminClientConfig, agentUrlFromAdmin, apiUrlFromAdmin, guardNotMain, pg } from './helpers.js';
 
 if (!ADMIN_URL) {
@@ -75,10 +76,10 @@ async function run() {
       await c.query("insert into ops.agent_runs (run_id, org_id, mode, status, n_flags, n_drafts) values ($1,$2,'rules','ok',1,1)", [ids.run, org]);
       await c.query(
         `insert into ops.agent_actions (action_id, run_id, org_id, tier, kind, entity_type, entity_id, payload)
-         values ($1,$2,$3,'T1','repair_at_risk','work_order','WO1','{}')`, [ids.t1, ids.run, org]);
+         values ($1,$2,$3,'T1','repair_at_risk','work_order','WO-' || substr(md5(random()::text), 1, 12),'{}')`, [ids.t1, ids.run, org]);
       await c.query(
         `insert into ops.agent_actions (action_id, run_id, org_id, tier, kind, entity_type, entity_id, payload, draft_text)
-         values ($1,$2,$3,'T2',$4,'work_order','WO1','{}',$5)`, [ids.t2, ids.run, org, T2_KIND, text]);
+         values ($1,$2,$3,'T2',$4,'work_order','WO-' || substr(md5(random()::text), 1, 12),'{}',$5)`, [ids.t2, ids.run, org, T2_KIND, text]);
       await c.query("insert into ops.approvals (approval_id, action_id, org_id, status) values ($1,$2,$3,'pending')", [ids.approval, ids.t2, org]);
     });
     return ids;
@@ -491,6 +492,182 @@ async function run() {
       const stored = await admin.query('select draft_text, draft_sha256 from ops.agent_actions where action_id = $1', [s.t2]);
       assert.equal(r.rows[0].draft_text_at_decision, stored.rows[0].draft_text);
       assert.equal(r.rows[0].draft_sha256, stored.rows[0].draft_sha256);
+    });
+  });
+
+  // ======================================================================================================
+  // M5c hardening (migration 34)
+  describe('migration 34 constraints and duplicate protection', () => {
+    const run = (org, extra = '') => ({ id: uuid(), org, extra });
+    const insertRun = (c, id, org, cols = '', vals = '', params = []) =>
+      c.query(`insert into ops.agent_runs (run_id, org_id, mode, status, finished_at ${cols}) values ($1,$2,'rules','ok', now() ${vals})`, [id, org, ...params]);
+    const insertT2 = (c, runId, org, entity, kind = T2_KIND, text = 'Status update. This clock is a rebuttable presumption, not a legal finding.') => {
+      const id = uuid();
+      return c.query(
+        `insert into ops.agent_actions (action_id, run_id, org_id, tier, kind, entity_type, entity_id, payload, draft_text)
+         values ($1,$2,$3,'T2',$4,'work_order',$5,'{}',$6)`, [id, runId, org, kind, entity, text]).then(() => id);
+    };
+    const insertPending = (c, actionId, org) =>
+      c.query("insert into ops.approvals (approval_id, action_id, org_id, status) values ($1,$2,$3,'pending')", [uuid(), actionId, org]);
+
+    test('a second PENDING draft for the same work order and kind is refused by the database (23505, approvals_one_pending_idx)', async () => {
+      const entity = `WO-DUP-${uuid().slice(0, 6)}`;
+      const r1 = uuid();
+      await asWriter(ORG1, async (c) => {
+        await insertRun(c, r1, ORG1);
+        await insertPending(c, await insertT2(c, r1, ORG1, entity), ORG1);
+      });
+      const r2 = uuid();
+      await assert.rejects(
+        asWriter(ORG1, async (c) => {
+          await insertRun(c, r2, ORG1);
+          await insertPending(c, await insertT2(c, r2, ORG1, entity), ORG1);
+        }),
+        (e) => e.code === '23505' && e.constraint === 'approvals_one_pending_idx');
+      assert.equal((await admin.query('select count(*)::int n from ops.agent_runs where run_id = $1', [r2])).rows[0].n, 0, 'the whole second run rolled back');
+    });
+
+    test('the same work order and kind is allowed in another org, for another kind, and again once the first is decided', async () => {
+      const entity = `WO-OK-${uuid().slice(0, 6)}`;
+      const base = uuid();
+      let firstApproval;
+      await asWriter(ORG1, async (c) => {
+        await insertRun(c, base, ORG1);
+        const a = await insertT2(c, base, ORG1, entity);
+        firstApproval = uuid();
+        await c.query("insert into ops.approvals (approval_id, action_id, org_id, status) values ($1,$2,$3,'pending')", [firstApproval, a, ORG1]);
+        const b = await insertT2(c, base, ORG1, entity, 'vendor_reassignment_suggestion');
+        await insertPending(c, b, ORG1);
+      });
+      const other = uuid();
+      await asWriter(ORG2, async (c) => {
+        await insertRun(c, other, ORG2);
+        await insertPending(c, await insertT2(c, other, ORG2, entity), ORG2);
+      });
+      await decide('api_property_manager', { org: ORG1, user: 'pm.test', actor: 'human' }, firstApproval, 'rejected');
+      const again = uuid();
+      await asWriter(ORG1, async (c) => {
+        await insertRun(c, again, ORG1);
+        await insertPending(c, await insertT2(c, again, ORG1, entity), ORG1);
+      });
+    });
+
+    test('entity_id and kind on an approval always come from the action row; a forged value is overwritten', async () => {
+      const entity = `WO-FILL-${uuid().slice(0, 6)}`;
+      const r = uuid();
+      let approval;
+      await asWriter(ORG1, async (c) => {
+        await insertRun(c, r, ORG1);
+        const a = await insertT2(c, r, ORG1, entity);
+        approval = uuid();
+        await c.query(
+          "insert into ops.approvals (approval_id, action_id, org_id, status, entity_id, kind) values ($1,$2,$3,'pending','FORGED','forged_kind')",
+          [approval, a, ORG1]);
+      });
+      const row = (await admin.query('select entity_id, kind from ops.approvals where approval_id = $1', [approval])).rows[0];
+      assert.deepEqual(row, { entity_id: entity, kind: T2_KIND });
+    });
+
+    test('the writer still cannot read agent_actions (the fill trigger leaks nothing to it)', async () => {
+      await assert.rejects(asWriter(ORG1, (c) => c.query('select entity_id from ops.agent_actions limit 1')), (e) => e.code === '42501');
+      await assert.rejects(asWriter(ORG1, (c) => c.query('select ops.approvals_fill_entity()')), (e) => e.code === '42501');
+    });
+
+    test('the run row is written last: actions first is fine (deferred key), but a missing run fails at COMMIT (23503)', async () => {
+      const r = uuid();
+      await asWriter(ORG1, async (c) => {
+        await insertT2(c, r, ORG1, `WO-DEF-${uuid().slice(0, 6)}`);
+        await insertRun(c, r, ORG1);
+      });
+      assert.equal((await admin.query('select count(*)::int n from ops.agent_actions where run_id = $1', [r])).rows[0].n, 1);
+      const ghost = uuid();
+      await assert.rejects(asWriter(ORG1, (c) => insertT2(c, ghost, ORG1, `WO-GH-${uuid().slice(0, 6)}`)), (e) => e.code === '23503');
+    });
+
+    test('finished_at cannot be NULL (agent_runs_finished_chk)', async () => {
+      await assert.rejects(
+        asWriter(ORG1, (c) => c.query("insert into ops.agent_runs (run_id, org_id, mode, status, finished_at) values ($1,$2,'rules','ok',null)", [uuid(), ORG1])),
+        (e) => e.code === '23514' && e.constraint === 'agent_runs_finished_chk');
+    });
+
+    test('error_code longer than 500 characters is refused (agent_runs_error_code_chk)', async () => {
+      await insertRunOk(ORG1, 'x'.repeat(500));
+      await assert.rejects(insertRunOk(ORG1, 'x'.repeat(501)), (e) => e.code === '23514' && e.constraint === 'agent_runs_error_code_chk');
+    });
+    const insertRunOk = (org, errorCode) =>
+      asWriter(org, (c) => c.query("insert into ops.agent_runs (run_id, org_id, mode, status, finished_at, error_code) values ($1,$2,'rules','ok',now(),$3)", [uuid(), org, errorCode]));
+
+    test('rejections must be a JSON array under 16 KB, n_duplicates_skipped cannot be negative; both default sensibly', async () => {
+      const ok = uuid();
+      await asWriter(ORG1, (c) => insertRun(c, ok, ORG1));
+      const d = (await admin.query('select rejections, n_duplicates_skipped from ops.agent_runs where run_id = $1', [ok])).rows[0];
+      assert.deepEqual(d, { rejections: [], n_duplicates_skipped: 0 });
+      const bad = (extra, val) => asWriter(ORG1, (c) => c.query(`insert into ops.agent_runs (run_id, org_id, mode, status, finished_at, ${extra}) values ($1,$2,'rules','ok',now(),$3)`, [uuid(), ORG1, val]));
+      await assert.rejects(bad('rejections', '{"a":1}'), (e) => e.code === '23514' && e.constraint === 'agent_runs_rejections_chk');
+      await assert.rejects(bad('rejections', JSON.stringify([{ pad: 'y'.repeat(20000) }])), (e) => e.code === '23514' && e.constraint === 'agent_runs_rejections_chk');
+      await assert.rejects(bad('n_duplicates_skipped', -1), (e) => e.code === '23514' && e.constraint === 'agent_runs_dup_chk');
+    });
+
+    test('action payload must be a JSON object under 16 KB (agent_actions_payload_chk)', async () => {
+      const r = uuid();
+      const tryPayload = (payload) =>
+        asWriter(ORG1, async (c) => {
+          await insertRun(c, r, ORG1);
+          await c.query(
+            `insert into ops.agent_actions (action_id, run_id, org_id, tier, kind, entity_type, entity_id, payload)
+             values ($1,$2,$3,'T1','repair_at_risk','work_order','WO-PAY',$4::jsonb)`, [uuid(), r, ORG1, payload]);
+        });
+      await assert.rejects(tryPayload('[1,2]'), (e) => e.code === '23514' && e.constraint === 'agent_actions_payload_chk');
+      await assert.rejects(tryPayload(JSON.stringify({ pad: 'z'.repeat(20000) })), (e) => e.code === '23514' && e.constraint === 'agent_actions_payload_chk');
+    });
+
+    test('a pending approval cannot carry a decision snapshot (approvals_pending_snapshot_chk)', async () => {
+      const r = uuid();
+      await assert.rejects(
+        asWriter(ORG1, async (c) => {
+          await insertRun(c, r, ORG1);
+          const a = await insertT2(c, r, ORG1, `WO-SNAP-${uuid().slice(0, 6)}`);
+          await c.query(
+            "insert into ops.approvals (approval_id, action_id, org_id, status, draft_text_at_decision, draft_sha256) values ($1,$2,$3,'pending','junk','junk')",
+            [uuid(), a, ORG1]);
+        }),
+        (e) => e.code === '23514' && e.constraint === 'approvals_pending_snapshot_chk');
+    });
+
+    test('every T2 row has a well-formed 64-hex hash and no T1 row has one (agent_actions_hash_chk is in place and valid)', async () => {
+      const bad = await admin.query("select count(*)::int n from ops.agent_actions where (tier = 'T2') <> (draft_sha256 is not null) or (draft_sha256 is not null and draft_sha256 !~ '^[0-9a-f]{64}$')");
+      assert.equal(bad.rows[0].n, 0);
+      const c = await admin.query("select convalidated from pg_constraint where conname = 'agent_actions_hash_chk'");
+      assert.equal(c.rows.length, 1);
+      assert.equal(c.rows[0].convalidated, true);
+    });
+
+    test('the real writer: a repeated run keeps its flags, skips the repeated draft, counts it, and stores the rejection log', async () => {
+      const writer = createWriter({ connectionString: agentUrl });
+      const entity = `WO-W-${uuid().slice(0, 6)}`;
+      const actions = [
+        { tier: 'T1', kind: 'repair_at_risk', entityId: entity, payload: { reason: 'r' } },
+        { tier: 'T2', kind: T2_KIND, entityId: entity, payload: {}, draftText: 'Short factual update. This clock is a rebuttable presumption, not a legal finding.' },
+      ];
+      const t = new Date().toISOString();
+      const a = await writer.write({ run: { org: ORG1, mode: 'rules', status: 'ok', startedAt: t, finishedAt: t }, actions });
+      assert.deepEqual([a.nFlags, a.nDrafts, a.nDuplicatesSkipped], [1, 1, 0]);
+      const rejections = [{ batch: 1, code: 'reason:forbidden:markup', field: 'flags[0].reason', rule: 'forbidden:markup', classes: ['gt'], length: 8, sha8: 'abcd1234' }];
+      const b = await writer.write({ run: { org: ORG1, mode: 'rules', status: 'rejected_output', rejections, startedAt: t, finishedAt: t }, actions });
+      assert.deepEqual([b.nFlags, b.nDrafts, b.nDuplicatesSkipped], [1, 0, 1]);
+      const run = (await admin.query('select n_flags, n_drafts, n_duplicates_skipped, rejections from ops.agent_runs where run_id = $1', [b.runId])).rows[0];
+      assert.deepEqual(run, { n_flags: 1, n_drafts: 0, n_duplicates_skipped: 1, rejections });
+      const rows = (await admin.query("select count(*)::int n from ops.agent_actions where run_id = $1 and tier = 'T2'", [b.runId])).rows[0].n;
+      assert.equal(rows, 0, 'the skipped draft left no action row behind (savepoint rolled back)');
+      const pending = (await admin.query("select count(*)::int n from ops.approvals where org_id = $1 and entity_id = $2 and status = 'pending'", [ORG1, entity])).rows[0].n;
+      assert.equal(pending, 1);
+    });
+
+    test('running migration 34 again changes nothing and fails nothing (idempotent)', async () => {
+      const fs = await import('node:fs');
+      const sql = fs.readFileSync(new URL('../../ingest/sql/34_ops_hardening.sql', import.meta.url), 'utf8');
+      await admin.query(sql);
+      await admin.query(sql);
     });
   });
 }
