@@ -32,3 +32,7 @@ Same rules as the API (`docs/api.md`): the database decides. Pages a role cannot
 - Sessions live in server memory (a restart signs everyone out). No rate limiting. Single instance only.
 - Read-only except approve and reject. The agent is run by an operator from the command line, not from the app.
 - No browser-level automated tests yet; the screens were checked by hand with headless Chrome.
+
+## Look and feel (M9)
+
+The sign-in and the home (Overview) use an espresso and gold style. The home layout follows the "Good evening" design; the sign-in follows the DoorSignal login design. The photos in `web/client/public/img/` are cut from design images made outside this repo (an AI image tool). They are placeholders: replace them with sharp, licensed originals before any public use. Text, numbers and links on these screens are live; the four card photos carry their titles in the picture. The home figures come from the same signals and approvals as the other pages. The mock's occupancy, revenue and portfolio-property figures are not shown because the API has no such data yet. The Content-Security-Policy now allows Google Fonts (styles and font files only).
