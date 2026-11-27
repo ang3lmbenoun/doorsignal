@@ -9,8 +9,8 @@ const ICON = {
   money: 'M12 3v18M16 7c-1-1-2-1.5-4-1.5S8 6.5 8 8.5 10 11 12 11.5s4 1 4 3-2 3-4 3-3-.5-4-1.5', risk: 'M12 3l9 16H3zM12 10v4M12 17v.5',
 };
 const NAV = [
-  ['campus', 'Property Campus'], ['overview', 'Management'], ['leases', 'Tenants and leases'], ['repairs', 'Maintenance'],
-  ['inbox', 'Complaints and requests'], ['signals', 'Analytics'], ['money', 'Expected loss'], ['risk', 'Risk register'],
+  ['campus', 'Overview'], ['overview', 'Management'], ['leases', 'Tenants'], ['repairs', 'Maintenance'],
+  ['inbox', 'Complaints'], ['signals', 'Analytics'], ['money', 'Expected loss'], ['risk', 'Risk register'],
 ];
 
 export default function App() {
@@ -37,8 +37,8 @@ export default function App() {
         <div className="brand"><Logo size={44} /><b>DoorSignal</b><small>Connect · Manage · Thrive</small></div>
         <nav>{NAV.filter(([id]) => can(id)).map(([id, label]) => <a key={id} href={`#${id}`} className={id === current ? 'on' : ''}><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d={ICON[id]} /></svg>{label}</a>)}</nav>
         <div className="who">
-          <strong>{user.name}</strong>
-          <span>{user.title}</span>
+          <img src="/img/avatar.jpg" alt="" />
+          <div className="wtext"><strong>{user.name}</strong><span>{user.title}</span></div>
           <button className="link" onClick={() => logout().then(() => { setUser(null); window.location.hash = ''; })}>Sign out</button>
         </div>
       </aside>
