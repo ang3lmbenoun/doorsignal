@@ -27,6 +27,9 @@ Stack: Postgres on Neon, dbt-core, Python (simulator, ingest, risk), Node/Expres
 
 You have it working when `run_dbt build` ends with all tests passing and `pytest -q` is green. The CI workflow does the same on a throwaway Neon branch.
 
+## Web app
+`web/` is a React app with a small server in front of the API. Demo sign-in with six synthetic people; each sees only what their role allows, and the approval inbox lets a manager approve or reject agent drafts (nothing is sent). How to run it: `docs/web.md`.
+
 ## Signals (v1)
 
 S01 Texas repair clock (a rebuttable 7.0-day presumption, not a legal finding; attorney review before real use) · S02 assignment delay · S03 first-90-day experience · S04 renewal risk · S05 payment timing shift · S06 delinquency aging · S07 vacancy loss · S08 vendor drift · S09 repeat issues · S12. Each has a registry row (inputs, refresh, threshold, evidence grade A/B/C, action tier, known failure modes). Grades show next to every value with a lineage link.

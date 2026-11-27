@@ -134,3 +134,19 @@ jobs:
           # Agent tests use fake or recorded providers only: refuse to run if a live LLM key is in this environment.
           if env | grep -qE '^(NVIDIA|GOOGLE|OPENROUTER|ANTHROPIC|GROQ)_API_KEY=.+'; then echo 'LLM key present in the test environment'; exit 1; fi
           npm run test:leaks --prefix api
+
+  web:
+    # M8 web app: backend-for-frontend tests (no database) and a production build of the React client.
+    runs-on: ubuntu-latest
+    needs: checks
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci --prefix web
+      - run: npm test --prefix web
+      - run: npm run build --prefix web
+      - run: npm audit --omit=dev --prefix web

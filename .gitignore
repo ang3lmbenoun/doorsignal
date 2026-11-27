@@ -16,3 +16,4 @@ dbt/logs/
 sim/out/
 data/reference/*
 !data/reference/.gitkeep
+web/client/dist/
