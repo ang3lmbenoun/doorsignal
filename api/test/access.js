@@ -16,7 +16,7 @@ export const ACCESS = {
     rules: {
       owner: own,
       property_manager: org,
-      maintenance_coordinator: (r, c) => org(r, c) && ['S01', 'S02', 'S08'].includes(r.signal_id),
+      maintenance_coordinator: (r, c) => org(r, c) && ['S01', 'S02', 'S08', 'S09'].includes(r.signal_id),
       leasing_manager: (r, c) => org(r, c) && ['S03', 'S04'].includes(r.signal_id),
       data_owner: all,
     },

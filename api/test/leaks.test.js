@@ -312,7 +312,9 @@ async function runMatrix() {
         const r = await admin.query(
           `select n.nspname || '.' || c.relname as rel from pg_class c join pg_namespace n on n.oid = c.relnamespace
            where c.relkind in ('r','v','m','p','f') and n.nspname not in ('pg_catalog','information_schema','serving')
-             and n.nspname not like 'pg_toast%' and has_table_privilege($1, c.oid, 'SELECT')`, [role]);
+             and n.nspname not like 'pg_toast%' and has_table_privilege($1, c.oid, 'SELECT')
+             and not (n.nspname = 'ops' and c.relname in ('agent_runs', 'agent_actions', 'approvals')
+                      and $1 in ('api_property_manager', 'api_maintenance_coordinator'))`, [role]);
         assert.deepEqual(r.rows, []);
         const v = await admin.query("select has_table_privilege($1, 'serving.vendor_signals', 'SELECT') as s", [role]);
         assert.equal(v.rows[0].s, false);
@@ -323,7 +325,9 @@ async function runMatrix() {
         `select n.nspname, r.rolname from pg_namespace n cross join pg_roles r
          where r.rolname = any($1) and n.nspname <> 'serving' and n.nspname not like 'pg\\_toast%'
            and n.nspname not in ('pg_catalog', 'information_schema')
-           and (has_schema_privilege(r.rolname, n.nspname, 'USAGE') or has_schema_privilege(r.rolname, n.nspname, 'CREATE'))`,
+           and (has_schema_privilege(r.rolname, n.nspname, 'CREATE')
+                or (has_schema_privilege(r.rolname, n.nspname, 'USAGE')
+                    and not (n.nspname = 'ops' and r.rolname in ('api_property_manager', 'api_maintenance_coordinator'))))`,
         [roles]);
       assert.deepEqual(r.rows, []);
     });

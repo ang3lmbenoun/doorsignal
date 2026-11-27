@@ -3,6 +3,7 @@
     python -m ingest.api_sql roles   # 30_api_roles.sql (once per database)
     python -m ingest.api_sql rls     # 31_serving_rls.sql (after every dbt build)
     python -m ingest.api_sql all
+    python -m ingest.api_sql guard     # exit 0 only if the target is not the main database
     python -m ingest.api_sql password  # api_login password from API_LOGIN_PASSWORD (never printed)
 
 The target URL is read from the env var named by --url-env (default NEON_TEST_DATABASE_URL).
@@ -19,13 +20,18 @@ from ingest.db import ROOT, ConfigError
 
 SQL_DIR = ROOT / "ingest" / "sql"
 FILES = {"roles": "30_api_roles.sql", "rls": "31_serving_rls.sql"}
+OPS_FILES = ["32_ops_approvals.sql", "33_ops_rls.sql"]
+PASSWORD_ENV = {"api_login": "API_LOGIN_PASSWORD", "api_agent_writer": "AGENT_WRITER_PASSWORD"}
 
 
 def _host(url: str) -> str:
     """Host without Neon's pooler suffix, so pooled and direct URLs compare equal."""
-    from urllib.parse import urlparse
+    from urllib.parse import parse_qs, urlparse
 
-    return (urlparse(url).hostname or "").replace("-pooler", "")
+    parsed = urlparse(url)
+    if {"host", "hostaddr"} & set(parse_qs(parsed.query)):
+        raise ConfigError("URLs with a host or hostaddr query parameter are refused.")
+    return (parsed.hostname or "").replace("-pooler", "")
 
 
 def target_url(url_env: str) -> str:
@@ -35,9 +41,17 @@ def target_url(url_env: str) -> str:
     url = os.environ.get(url_env, "").strip()
     if not url:
         raise ConfigError(f"{url_env} is not set (Neon branch URL, in .env or the environment).")
+    # The main host comes from MAIN_DATABASE_HOST (a host name, not a secret) or from DATABASE_URL.
+    # In CI an unknown main host is an error: the guard must not pass just because nothing was
+    # configured to compare with.
+    main_host = os.environ.get("MAIN_DATABASE_HOST", "").strip().replace("-pooler", "")
     main = os.environ.get("DATABASE_URL", "").strip()
-    if main and _host(url) == _host(main):
-        raise ConfigError(f"{url_env} has the same host as DATABASE_URL (main). Use a branch.")
+    if not main_host and main:
+        main_host = _host(main)
+    if not main_host and os.environ.get("GITHUB_ACTIONS") == "true":
+        raise ConfigError("The main database host is unknown (set MAIN_DATABASE_HOST).")
+    if main_host and _host(url) == main_host:
+        raise ConfigError(f"{url_env} has the same host as the main database. Use a branch.")
     return url
 
 
@@ -45,35 +59,45 @@ def role_exists(conn, name: str) -> bool:
     return conn.execute("select 1 from pg_roles where rolname = %s", (name,)).fetchone() is not None
 
 
-def set_password(conn) -> None:
+def set_password(conn, role: str = "api_login") -> None:
     from psycopg import sql
 
-    password = os.environ.get("API_LOGIN_PASSWORD", "")
+    if role not in PASSWORD_ENV:
+        raise ConfigError(f"No password variable is defined for role {role}.")
+    var = PASSWORD_ENV[role]
+    password = os.environ.get(var, "")
     if len(password) < 24:
-        raise ConfigError("API_LOGIN_PASSWORD is not set or shorter than 24 characters.")
-    conn.execute(sql.SQL("alter role api_login password {}").format(sql.Literal(password)))
-    print("api_login password set")
+        raise ConfigError(f"{var} is not set or shorter than 24 characters.")
+    stmt = sql.SQL("alter role {} password {}").format(sql.Identifier(role), sql.Literal(password))
+    conn.execute(stmt)
+    print(f"{role} password set")
 
 
 def apply(conn, which: str) -> None:
-    for key in (["roles", "rls"] if which == "all" else [which]):
-        conn.execute((SQL_DIR / FILES[key]).read_text(encoding="utf-8"))
-        print(f"applied {FILES[key]}")
+    keys = {"all": ["roles", "rls", "ops"]}.get(which, [which])
+    for key in keys:
+        for name in (OPS_FILES if key == "ops" else [FILES[key]]):
+            conn.execute((SQL_DIR / name).read_text(encoding="utf-8"))
+            print(f"applied {name}")
 
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("which", choices=["roles", "rls", "all", "password"])
+    ap.add_argument("which", choices=["guard", "roles", "rls", "ops", "all", "password"])
     ap.add_argument("--url-env", default="NEON_TEST_DATABASE_URL")
+    ap.add_argument("--role", default="api_login", help="role for the password command")
     args = ap.parse_args(argv)
     try:
         url = target_url(args.url_env)
     except ConfigError as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 2
+    if args.which == "guard":
+        print("target is not the main database")
+        return 0
     with psycopg.connect(url, connect_timeout=15, autocommit=True) as conn:
         if args.which == "password":
-            set_password(conn)
+            set_password(conn, args.role)
         else:
             apply(conn, args.which)
     return 0

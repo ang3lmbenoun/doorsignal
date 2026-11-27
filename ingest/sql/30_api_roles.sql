@@ -44,7 +44,7 @@ alter role api_login set idle_in_transaction_session_timeout = '10s';
 do $$
 declare s text;
 begin
-    foreach s in array array['ground_truth', 'raw', 'staging', 'intermediate', 'marts', 'signals', 'risk', 'ops'] loop
+    foreach s in array array['ground_truth', 'raw', 'staging', 'intermediate', 'marts', 'signals', 'risk'] loop
         if exists (select 1 from pg_namespace where nspname = s) then
             execute format('revoke all on all tables in schema %I from api_login, api_owner, api_property_manager, '
                            'api_maintenance_coordinator, api_leasing_manager, api_data_owner', s);
@@ -57,6 +57,22 @@ begin
 end $$;
 revoke all on schema ground_truth from public;
 revoke all on all tables in schema ground_truth from public;
+
+-- ops holds pipeline logs (closed to every API role) and the M5b approval inbox. The three inbox tables and the
+-- usage the human approver roles need are granted by 33_ops_rls.sql; this block must not undo them, so it
+-- revokes per table except those three, and revokes schema usage only from roles that never need it.
+do $$
+declare t record;
+begin
+    if exists (select 1 from pg_namespace where nspname = 'ops') then
+        for t in select tablename from pg_tables
+                 where schemaname = 'ops' and tablename not in ('agent_runs', 'agent_actions', 'approvals') loop
+            execute format('revoke all on ops.%I from public, api_login, api_owner, api_property_manager, '
+                           'api_maintenance_coordinator, api_leasing_manager, api_data_owner', t.tablename);
+        end loop;
+        revoke all on schema ops from public, api_login, api_owner, api_leasing_manager, api_data_owner;
+    end if;
+end $$;
 
 -- The public schema: no API role may use it, directly or through PUBLIC. (Nothing in this project lives
 -- there; the dbt and ingest roles use their own schemas.)
