@@ -92,3 +92,23 @@ main.login { padding:0; max-width:none; } .login { display:grid; grid-template-c
 
 @media (max-width:1100px){ .ov,.split { grid-template-columns:1fr; } .login { grid-template-columns:1fr; } .login .art { min-height:200px; } }
 @media (max-width:900px){ .shell{grid-template-columns:1fr;} aside{position:static; height:auto; flex-direction:row; flex-wrap:wrap; align-items:center;} nav{flex-direction:row; flex-wrap:wrap; margin:0;} .who{margin-top:0;} main{padding:16px;} }
+
+/* Live campus scene */
+.clive { margin-bottom: 16px; }
+.cl-stage { position: relative; overflow: hidden; border-radius: 12px; border: 1px solid var(--line); background: #000; aspect-ratio: 3 / 2; max-height: 560px; width: 100%; touch-action: none; cursor: grab; user-select: none; }
+.cl-stage:active { cursor: grabbing; }
+.cl-world { position: absolute; inset: 0; transform-origin: 0 0; }
+.cl-world img, .cl-world canvas, .cl-world svg, .cl-tint { position: absolute; inset: 0; width: 100%; height: 100%; }
+.cl-world img { object-fit: fill; pointer-events: none; }
+.cl-world canvas, .cl-tint { pointer-events: none; }
+.cl-spot { fill: rgba(230, 201, 140, 0); stroke: rgba(230, 201, 140, 0); stroke-width: 2; cursor: pointer; transition: fill .15s, stroke .15s; outline: none; }
+.cl-spot:hover, .cl-spot:focus, .cl-spot.on { fill: rgba(230, 201, 140, .16); stroke: rgba(230, 201, 140, .9); }
+.cl-card { position: absolute; left: 12px; bottom: 56px; background: rgba(17, 11, 8, .92); border: 1px solid var(--line2); border-radius: 12px; padding: 12px 14px; display: grid; gap: 4px; min-width: 200px; }
+.cl-card strong { font-size: 12px; color: var(--gold); font-weight: 500; }
+.cl-card b { font-size: 16px; font-weight: 500; }
+.cl-card span { font-size: 12px; color: var(--mute); }
+.cl-card .chipbtn { margin-top: 6px; }
+.cl-ctl { position: absolute; right: 12px; top: 12px; display: grid; gap: 6px; }
+.cl-ctl button, .cl-time button { width: 32px; height: 32px; border-radius: 8px; background: rgba(17, 11, 8, .85); border: 1px solid var(--line2); color: var(--ink); cursor: pointer; }
+.cl-time { position: absolute; right: 12px; bottom: 12px; display: flex; gap: 8px; align-items: center; background: rgba(17, 11, 8, .85); border: 1px solid var(--line2); border-radius: 10px; padding: 4px 10px; font-size: 12px; }
+.cl-time button { width: auto; padding: 0 10px; height: 26px; }

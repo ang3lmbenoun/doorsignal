@@ -1,6 +1,7 @@
 import React from 'react';
 import { getPersonas, list, login } from './api.js';
 import { Async, useLoad } from './ui.jsx';
+import CampusLive from './CampusLive.jsx';
 
 export function Logo({ size = 40 }) {
   return (
@@ -74,6 +75,7 @@ export function Campus({ user, can }) {
         <div><h1>{greeting()}, {first}</h1><p>Here is what is happening across your properties today.</p></div>
         <span className="demo">Demo · synthetic data</span>
       </div>
+      <CampusLive can={can} stats={{ repairs: cnt(s01, ['breach_presumed']), renewal: cnt(s04, ['high']), drafts: can('inbox') && pend.data ? pendingRows.length : undefined }} />
       <div className="kpirow">
         {tiles.map(([l, v, sub, tone]) => (
           <div className={`kpi ${Number(v) > 0 || tone === 'gold' ? tone : ''}`} key={l}><span>{l}</span><b>{v}</b>{sub ? <em>{sub}</em> : null}</div>
