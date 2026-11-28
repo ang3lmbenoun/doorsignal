@@ -95,7 +95,7 @@ main.login { padding:0; max-width:none; } .login { display:grid; grid-template-c
 
 /* Live campus scene */
 .clive { margin-bottom: 16px; }
-.cl-stage { position: relative; overflow: hidden; border-radius: 12px; border: 1px solid var(--line); background: #000; aspect-ratio: 3 / 2; max-height: 560px; width: 100%; touch-action: none; cursor: grab; user-select: none; }
+.cl-stage { position: relative; overflow: hidden; border-radius: 12px; border: 1px solid var(--line); background: #000; aspect-ratio: 3 / 2; width: min(100%, calc((100vh - 200px) * 1.5)); margin: 0 auto; touch-action: none; cursor: grab; user-select: none; }
 .cl-stage:active { cursor: grabbing; }
 .cl-world { position: absolute; inset: 0; transform-origin: 0 0; }
 .cl-world img, .cl-world canvas, .cl-world svg, .cl-tint { position: absolute; inset: 0; width: 100%; height: 100%; }
